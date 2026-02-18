@@ -32,7 +32,7 @@ export default function RegisterPage() {
 
   const allMet = passwordRequirements.every((r) => r.met)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
     setIsSubmitting(true)
@@ -60,7 +60,7 @@ export default function RegisterPage() {
       return
     }
 
-    const result = register({
+    const result = await register({
       nombre: formData.nombre,
       apellido: formData.apellido,
       email: formData.email,

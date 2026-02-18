@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { registerSchema } from "@/lib/validations/auth.schema"
 import { findUserByEmail, createUser } from "@/lib/services/auth.service"
-import type { ApiResponse } from "@/lib/types"
+import type { ApiResponse, UserPublic } from "@/lib/types"
 
 export async function POST(req: NextRequest) {
   try {
@@ -26,16 +26,18 @@ export async function POST(req: NextRequest) {
 
     const user = await createUser(parsed.data)
 
-    return NextResponse.json<ApiResponse>(
-      {
-        success: true,
-        data: {
-          id: user._id.toString(),
-          name: user.name,
-          email: user.email,
-          role: user.role,
-        },
-      },
+    const userPublic: UserPublic = {
+      id: user._id.toString(),
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      shopName: user.shopName,
+      isActive: user.isActive,
+      createdAt: user.createdAt.toISOString(),
+    }
+
+    return NextResponse.json<ApiResponse<UserPublic>>(
+      { success: true, data: userPublic },
       { status: 201 }
     )
   } catch (error) {

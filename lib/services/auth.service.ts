@@ -1,5 +1,17 @@
 import { connectDB } from "@/lib/db/connection"
 import { User } from "@/lib/db/models"
+import bcrypt from "bcryptjs"
+
+interface AuthUserRecord {
+  _id: { toString: () => string }
+  name: string
+  email: string
+  password: string
+  role: "superadmin" | "seller" | "buyer"
+  shopName?: string
+  isActive: boolean
+  createdAt: Date
+}
 
 /**
  * Busca un usuario por email.
@@ -19,12 +31,31 @@ export async function createUser(data: {
   shopName?: string
 }) {
   await connectDB()
+  const hashedPassword = await bcrypt.hash(data.password, 10)
+
   const user = new User({
     ...data,
     email: data.email.toLowerCase(),
-    // TODO: bcrypt.hash(data.password, 10)
+    password: hashedPassword,
   })
   return user.save()
+}
+
+export async function validateUserCredentials(email: string, password: string) {
+  await connectDB()
+  const user = await User.findOne({ email: email.toLowerCase() }).lean<AuthUserRecord>()
+
+  if (!user) {
+    return null
+  }
+
+  const isValidPassword = await bcrypt.compare(password, user.password)
+
+  if (!isValidPassword) {
+    return null
+  }
+
+  return user
 }
 
 export async function getUserById(id: string) {

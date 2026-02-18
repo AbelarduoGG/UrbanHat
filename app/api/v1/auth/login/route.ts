@@ -1,7 +1,17 @@
 import { NextRequest, NextResponse } from "next/server"
 import { loginSchema } from "@/lib/validations/auth.schema"
-import { findUserByEmail } from "@/lib/services/auth.service"
+import { validateUserCredentials } from "@/lib/services/auth.service"
 import type { ApiResponse, UserPublic } from "@/lib/types"
+
+type AuthUser = {
+  _id: { toString: () => string }
+  name: string
+  email: string
+  role: "superadmin" | "seller" | "buyer"
+  shopName?: string
+  isActive: boolean
+  createdAt: Date
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -15,17 +25,12 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const user = await findUserByEmail(parsed.data.email)
+    const user = (await validateUserCredentials(
+      parsed.data.email,
+      parsed.data.password
+    )) as AuthUser | null
 
     if (!user) {
-      return NextResponse.json<ApiResponse>(
-        { success: false, error: "Credenciales incorrectas" },
-        { status: 401 }
-      )
-    }
-
-    // TODO: Comparar con bcrypt.compare(parsed.data.password, user.password)
-    if (user.password !== parsed.data.password) {
       return NextResponse.json<ApiResponse>(
         { success: false, error: "Credenciales incorrectas" },
         { status: 401 }
