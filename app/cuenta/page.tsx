@@ -91,8 +91,8 @@ export default function AccountPage() {
     setTimeout(() => setSaved(false), 2500)
   }
 
-  const handleLogout = () => {
-    logout()
+  const handleLogout = async () => {
+    await logout()
     router.push("/")
   }
 

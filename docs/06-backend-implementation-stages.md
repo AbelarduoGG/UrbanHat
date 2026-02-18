@@ -80,7 +80,7 @@ Garantizar consistencia de inventario y pedidos.
 Blindar rutas y separar claramente permisos.
 
 ### Checklist
-- [ ] Middleware para rutas sensibles (`admin/seller`).
+- [x] Middleware base para rutas sensibles (`/cuenta`, `/api/v1/orders`) y control de rol en `/admin` cuando hay sesión backend.
 - [ ] Reglas por rol en servicios (no solo en frontend).
 - [ ] Sanitizar respuestas para nunca exponer `password`.
 - [ ] Rate limit básico en auth para evitar abuso.
@@ -128,3 +128,24 @@ Sí, puedes borrar la base cuando quieras y Mongoose no se rompe por eso.
   - usar una DB de `dev` separada de `prod`
   - tener script de seed para repoblar datos rápidamente
   - nunca reiniciar la base de producción sin backup
+
+---
+
+## Decisiones recomendadas para el proyecto escolar
+
+### 1) Registro de vendedores
+- **Recomendado (más control y menos riesgo):** alta de vendedores solo por `superadmin`/equipo.
+- Mantener registro público solo para compradores (`buyer`).
+- En una etapa posterior, se puede agregar solicitud de alta para seller con aprobación manual.
+
+### 2) Superadmin fijo
+- Evitar hardcodear `superadmin123` en código fuente.
+- Recomendado:
+  - crear un único superadmin inicial por seed
+  - password inicial por variable de entorno
+  - forzar cambio de contraseña desde panel al primer acceso
+
+### 3) Cloudinary para imágenes
+- Sí, **Cloudinary Free** es buena opción para proyecto escolar.
+- Ventajas: CDN, transformaciones, URLs estables, menor carga en backend.
+- En UrbanHat, guardar solo la URL final en `Product.imageUrl`.

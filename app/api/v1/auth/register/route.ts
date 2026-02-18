@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { registerSchema } from "@/lib/validations/auth.schema"
 import { findUserByEmail, createUser } from "@/lib/services/auth.service"
 import type { ApiResponse, UserPublic } from "@/lib/types"
+import { AUTH_COOKIE_NAME, serializeSession } from "@/lib/auth/session"
 
 export async function POST(req: NextRequest) {
   try {
@@ -36,10 +37,27 @@ export async function POST(req: NextRequest) {
       createdAt: user.createdAt.toISOString(),
     }
 
-    return NextResponse.json<ApiResponse<UserPublic>>(
+    const response = NextResponse.json<ApiResponse<UserPublic>>(
       { success: true, data: userPublic },
       { status: 201 }
     )
+
+    response.cookies.set({
+      name: AUTH_COOKIE_NAME,
+      value: serializeSession({
+        id: user._id.toString(),
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      }),
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 7,
+    })
+
+    return response
   } catch (error) {
     console.error("[POST /api/v1/auth/register]", error)
     return NextResponse.json<ApiResponse>(

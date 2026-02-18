@@ -1,27 +1,37 @@
-### Archivo 4: `docs/04-business-rules.md`
-La lógica de negocio para que Copilot sepa cómo programar las funciones.
-
-```markdown
 # 04. Reglas de Negocio y Lógica Crítica
 
-## 1. Gestión de Inventarios (Integridad)
-- **Validación de Stock:** Antes de crear una orden, el sistema debe consultar el campo `stock` de la colección `Products`.
-- **Atomicidad:** Al confirmar una compra, la operación de restar inventario y crear la orden debe ser secuencial y validada.
-- **Visualización:** En la App Móvil, si `stock == 0`, el botón de "Agregar al carrito" debe estar deshabilitado o el producto oculto.
+## 1) Gestión de inventario
 
-## 2. Lógica Multi-vendedor (Marketplace)
-- **Visibilidad Dashboard Vendedor:**
-    - Al hacer login en la web, si `role === 'seller'`, se debe ejecutar una query: `Product.find({ sellerId: session.user.id })`.
-    - Un vendedor **NUNCA** puede editar o borrar productos de otro vendedor.
-- **Cálculo de Comisiones (Simulado):**
-    - En el Dashboard de ventas, la "Ganancia Neta" se calcula visualmente:
-    - `Total Venta - 10% (Comisión Urban Hat) = Ganancia Vendedor`.
+- Antes de crear una orden se valida `stock` de cada producto.
+- Si un producto no tiene stock suficiente, se rechaza la compra.
+- Al confirmar compra se descuenta inventario y se registra la orden.
+- En móvil, productos sin stock se deben ocultar o deshabilitar para compra.
 
-## 3. Seguridad Simplificada (Escolar)
-- **Web:** Utilizar `NextAuth.js` con estrategia `Credentials` para manejo de sesiones seguras y protección de rutas `/admin`.
-- **Móvil:** Autenticación basada en ID simple (sin JWT complejo) para facilitar el desarrollo en Android/Kotlin.
-- **Roles:** Middleware en Next.js debe proteger `/admin` para que solo entren roles `admin` o `seller`.
+## 2) Marketplace multi-vendedor
 
-## 4. Restricciones
-- No implementar pasarela de pagos real (Stripe/PayPal). El flujo termina al crear la orden en base de datos.
-- Las imágenes se manejan estrictamente como URLs (String). No implementar subida de archivos (AWS S3) para ahorrar tiempo.
+- Cada producto pertenece a un `sellerId`.
+- Un vendedor solo puede gestionar sus productos.
+- Un vendedor nunca puede editar o eliminar productos de otro vendedor.
+- Ganancia neta (simulada) para dashboard seller: `venta - 10% comisión`.
+
+## 3) Seguridad (enfoque escolar/MVP)
+
+- **Web:** sesión por cookie HTTPOnly en login/register.
+- **Móvil:** autenticación temporal por header `x-user-id`.
+- **Middleware:**
+  - protege `/cuenta` (requiere sesión)
+  - valida autenticación para `/api/v1/orders` (cookie o `x-user-id`)
+  - aplica control de rol en `/admin` cuando existe sesión backend.
+- Roles permitidos: `superadmin`, `seller`, `buyer`.
+
+## 4) Separación de responsabilidades
+
+- **Móvil comprador:** catálogo, carrito, checkout, historial de órdenes.
+- **Web admin/seller:** gestión de productos, ventas e inventario.
+- Backend debe mantener la lógica en servicios (`lib/services/*`), no en vistas React.
+
+## 5) Restricciones del proyecto
+
+- No integrar pasarela de pagos real en esta etapa.
+- Imágenes de productos se manejan como URL.
+- Evitar features fuera de alcance académico/MVP.

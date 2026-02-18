@@ -46,7 +46,7 @@ interface AuthContextType {
     email: string
     password: string
   }) => Promise<{ success: boolean; error?: string }>
-  logout: () => void
+  logout: () => Promise<void>
   updateProfile: (updates: Partial<User>) => void
 }
 
@@ -160,7 +160,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await fetch("/api/v1/auth/logout", { method: "POST" })
+    } catch {
+      // no-op
+    }
+
     setUser(null)
     sessionStorage.removeItem("urban-hat-session")
   }
