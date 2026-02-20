@@ -11,4 +11,10 @@ export const updateAddressSchema = z.object({
   telefono: z.string().min(8, "Teléfono inválido").optional(),
 })
 
+export const adminUpdateUserSchema = z.object({
+  role: z.enum(["buyer", "seller"]).optional(),
+  isActive: z.boolean().optional(),
+})
+
 export type UpdateAddressInput = z.infer<typeof updateAddressSchema>
+export type AdminUpdateUserInput = z.infer<typeof adminUpdateUserSchema>
