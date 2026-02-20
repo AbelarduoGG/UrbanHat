@@ -15,9 +15,9 @@ export async function PUT(req: NextRequest) {
       )
     }
 
-    if (auth.role !== "buyer") {
+    if (auth.role !== "buyer" && auth.role !== "seller") {
       return NextResponse.json<ApiResponse>(
-        { success: false, error: "Solo compradores pueden editar dirección" },
+        { success: false, error: "Solo compradores y vendedores pueden editar dirección" },
         { status: 403 }
       )
     }
