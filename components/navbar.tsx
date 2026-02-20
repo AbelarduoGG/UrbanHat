@@ -21,6 +21,7 @@ export function Navbar() {
 
   const profileHref =
     user?.role === "superadmin" || user?.role === "seller" ? "/admin" : "/cuenta"
+  const canBuy = !user || user.role === "buyer"
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border bg-background/90 backdrop-blur-md">
@@ -89,19 +90,21 @@ export function Navbar() {
             </div>
           )}
 
-          <button
-            type="button"
-            onClick={() => setIsCartOpen(true)}
-            className="relative text-foreground transition-colors hover:text-accent"
-            aria-label="Abrir carrito"
-          >
-            <ShoppingBag className="h-6 w-6" />
-            {totalItems > 0 && (
-              <span className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-accent text-xs font-bold text-accent-foreground">
-                {totalItems}
-              </span>
-            )}
-          </button>
+          {canBuy && (
+            <button
+              type="button"
+              onClick={() => setIsCartOpen(true)}
+              className="relative text-foreground transition-colors hover:text-accent"
+              aria-label="Abrir carrito"
+            >
+              <ShoppingBag className="h-6 w-6" />
+              {totalItems > 0 && (
+                <span className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-accent text-xs font-bold text-accent-foreground">
+                  {totalItems}
+                </span>
+              )}
+            </button>
+          )}
 
           <button
             type="button"

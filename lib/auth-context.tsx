@@ -114,17 +114,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return
         }
       } catch {
-        // fallback a sesión local
+        setUser(null)
       }
 
-      const session = sessionStorage.getItem("urban-hat-session")
-      if (session) {
-        try {
-          setUser(JSON.parse(session))
-        } catch {
-          sessionStorage.removeItem("urban-hat-session")
-        }
-      }
+      sessionStorage.removeItem("urban-hat-session")
 
       setIsLoading(false)
     }

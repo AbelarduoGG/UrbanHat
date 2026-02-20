@@ -5,6 +5,7 @@ import Image from "next/image"
 import { Eye, Search, ShoppingBag } from "lucide-react"
 import type { Product } from "@/lib/products"
 import { useCart } from "@/lib/cart-context"
+import { useAuth } from "@/lib/auth-context"
 import { useProducts } from "@/lib/products-context"
 import { ProductModal } from "@/components/product-modal"
 
@@ -13,7 +14,9 @@ export function ProductsSection() {
   const [search, setSearch] = useState("")
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const { addToCart } = useCart()
+  const { user } = useAuth()
   const { products, isLoading } = useProducts()
+  const canBuy = !user || user.role === "buyer"
 
   const categories = useMemo(() => {
     const unique = Array.from(new Set(products.map((p) => p.category).filter(Boolean)))
@@ -110,21 +113,23 @@ export function ProductsSection() {
                   >
                     <Eye className="h-5 w-5" />
                   </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      addToCart({
-                        id: product.id,
-                        name: product.name,
-                        price: product.price,
-                        image: product.image,
-                      })
-                    }
-                    className="flex h-12 w-12 items-center justify-center bg-accent text-accent-foreground transition-transform hover:scale-110"
-                    aria-label={`Agregar ${product.name} al carrito`}
-                  >
-                    <ShoppingBag className="h-5 w-5" />
-                  </button>
+                  {canBuy && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        addToCart({
+                          id: product.id,
+                          name: product.name,
+                          price: product.price,
+                          image: product.image,
+                        })
+                      }
+                      className="flex h-12 w-12 items-center justify-center bg-accent text-accent-foreground transition-transform hover:scale-110"
+                      aria-label={`Agregar ${product.name} al carrito`}
+                    >
+                      <ShoppingBag className="h-5 w-5" />
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -155,7 +160,7 @@ export function ProductsSection() {
         </div>
       </div>
 
-      {selectedProduct && (
+      {selectedProduct && canBuy && (
         <ProductModal
           product={selectedProduct}
           onClose={() => setSelectedProduct(null)}

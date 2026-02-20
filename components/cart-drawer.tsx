@@ -4,8 +4,10 @@ import Image from "next/image"
 import Link from "next/link"
 import { X, Minus, Plus, Trash2, ShoppingBag } from "lucide-react"
 import { useCart } from "@/lib/cart-context"
+import { useAuth } from "@/lib/auth-context"
 
 export function CartDrawer() {
+  const { user } = useAuth()
   const {
     items,
     removeFromCart,
@@ -17,7 +19,9 @@ export function CartDrawer() {
     setIsCartOpen,
   } = useCart()
 
-  if (!isCartOpen) return null
+  const canBuy = !user || user.role === "buyer"
+
+  if (!isCartOpen || !canBuy) return null
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">

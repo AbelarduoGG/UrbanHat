@@ -103,3 +103,23 @@ export async function updateUserAddress(userId: string, address: UpdateAddressIn
     .select("-password")
     .lean()
 }
+
+export async function updateUserProfile(
+  userId: string,
+  data: { name: string; telefono?: string }
+) {
+  await connectDB()
+
+  return User.findByIdAndUpdate(
+    userId,
+    {
+      $set: {
+        name: data.name,
+        telefono: data.telefono,
+      },
+    },
+    { new: true }
+  )
+    .select("-password")
+    .lean()
+}

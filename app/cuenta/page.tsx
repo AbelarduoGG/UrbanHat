@@ -49,6 +49,8 @@ export default function AccountPage() {
     estado: "",
     codigoPostal: "",
   })
+  const [savingProfile, setSavingProfile] = useState(false)
+  const [savingAddress, setSavingAddress] = useState(false)
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -70,18 +72,43 @@ export default function AccountPage() {
     }
   }, [user, isLoading, router])
 
-  const handleSaveProfile = () => {
-    updateProfile({
-      nombre: profileData.nombre,
-      apellido: profileData.apellido,
-      telefono: profileData.telefono,
-    })
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2500)
+  const handleSaveProfile = async () => {
+    try {
+      setSavingProfile(true)
+      const response = await fetch("/api/v1/account/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nombre: profileData.nombre,
+          apellido: profileData.apellido,
+          telefono: profileData.telefono,
+        }),
+      })
+
+      const payload = await response.json()
+
+      if (!response.ok || !payload?.success) {
+        return
+      }
+
+      updateProfile({
+        nombre: profileData.nombre,
+        apellido: profileData.apellido,
+        telefono: profileData.telefono,
+      })
+
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2500)
+    } catch {
+      // no-op
+    } finally {
+      setSavingProfile(false)
+    }
   }
 
   const handleSaveAddress = async () => {
     try {
+      setSavingAddress(true)
       const response = await fetch("/api/v1/account/address", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -112,6 +139,8 @@ export default function AccountPage() {
       setTimeout(() => setSaved(false), 2500)
     } catch {
       // no-op
+    } finally {
+      setSavingAddress(false)
     }
   }
 
@@ -315,10 +344,11 @@ export default function AccountPage() {
                 <button
                   type="button"
                   onClick={handleSaveProfile}
+                  disabled={savingProfile}
                   className="mt-6 flex items-center gap-2 bg-accent px-6 py-3 text-sm font-bold uppercase tracking-widest text-accent-foreground transition-opacity hover:opacity-90"
                 >
                   <Save className="h-4 w-4" />
-                  Guardar Cambios
+                  {savingProfile ? "Guardando..." : "Guardar Cambios"}
                 </button>
               </div>
             )}
@@ -465,10 +495,11 @@ export default function AccountPage() {
                 <button
                   type="button"
                   onClick={handleSaveAddress}
+                  disabled={savingAddress}
                   className="mt-6 flex items-center gap-2 bg-accent px-6 py-3 text-sm font-bold uppercase tracking-widest text-accent-foreground transition-opacity hover:opacity-90"
                 >
                   <Save className="h-4 w-4" />
-                  Guardar Direccion
+                  {savingAddress ? "Guardando..." : "Guardar Direccion"}
                 </button>
               </div>
             )}
