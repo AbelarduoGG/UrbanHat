@@ -3,6 +3,7 @@ import { registerSchema } from "@/lib/validations/auth.schema"
 import { findUserByEmail, createUser } from "@/lib/services/auth.service"
 import type { ApiResponse, UserPublic } from "@/lib/types"
 import { AUTH_COOKIE_NAME, serializeSession } from "@/lib/auth/session"
+import { signAuthToken } from "@/lib/auth/jwt"
 
 export async function POST(req: NextRequest) {
   try {
@@ -25,7 +26,11 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const user = await createUser(parsed.data)
+    const user = await createUser({
+      ...parsed.data,
+      role: "buyer",
+      shopName: undefined,
+    })
 
     const userPublic: UserPublic = {
       id: user._id.toString(),
@@ -37,8 +42,15 @@ export async function POST(req: NextRequest) {
       createdAt: user.createdAt.toISOString(),
     }
 
-    const response = NextResponse.json<ApiResponse<UserPublic>>(
-      { success: true, data: userPublic },
+    const token = signAuthToken({
+      sub: user._id.toString(),
+      email: user.email,
+      role: user.role,
+      name: user.name,
+    })
+
+    const response = NextResponse.json<ApiResponse<UserPublic & { token: string }>>(
+      { success: true, data: { ...userPublic, token } },
       { status: 201 }
     )
 

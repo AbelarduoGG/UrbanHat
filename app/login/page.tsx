@@ -31,7 +31,12 @@ export default function LoginPage() {
 
     const result = await login(email, password)
     if (result.success) {
-      router.push("/cuenta")
+      if (result.role === "seller" || result.role === "superadmin") {
+        sessionStorage.setItem("urban-hat-admin", "true")
+        router.push("/admin")
+      } else {
+        router.push("/cuenta")
+      }
     } else {
       setError(result.error || "Error al iniciar sesion")
       setIsSubmitting(false)

@@ -80,15 +80,39 @@ export default function AccountPage() {
     setTimeout(() => setSaved(false), 2500)
   }
 
-  const handleSaveAddress = () => {
-    updateProfile({
-      direccion: addressData.direccion,
-      ciudad: addressData.ciudad,
-      estado: addressData.estado,
-      codigoPostal: addressData.codigoPostal,
-    })
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2500)
+  const handleSaveAddress = async () => {
+    try {
+      const response = await fetch("/api/v1/account/address", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          direccion: addressData.direccion,
+          ciudad: addressData.ciudad,
+          estado: addressData.estado,
+          codigoPostal: addressData.codigoPostal,
+          telefono: profileData.telefono,
+        }),
+      })
+
+      const payload = await response.json()
+
+      if (!response.ok || !payload?.success) {
+        return
+      }
+
+      updateProfile({
+        direccion: addressData.direccion,
+        ciudad: addressData.ciudad,
+        estado: addressData.estado,
+        codigoPostal: addressData.codigoPostal,
+        telefono: profileData.telefono,
+      })
+
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2500)
+    } catch {
+      // no-op
+    }
   }
 
   const handleLogout = async () => {

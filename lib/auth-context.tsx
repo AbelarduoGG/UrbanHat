@@ -29,6 +29,11 @@ interface UserApi {
   email: string
   role: "superadmin" | "seller" | "buyer"
   shopName?: string
+  telefono?: string
+  direccion?: string
+  ciudad?: string
+  estado?: string
+  codigoPostal?: string
   isActive: boolean
   createdAt: string
 }
@@ -39,7 +44,7 @@ interface AuthContextType {
   login: (
     email: string,
     password: string
-  ) => Promise<{ success: boolean; error?: string }>
+  ) => Promise<{ success: boolean; error?: string; role?: "superadmin" | "seller" | "buyer" }>
   register: (data: {
     nombre: string
     apellido: string
@@ -82,6 +87,11 @@ function mapApiUserToAuthUser(user: UserApi): User {
     email: user.email,
     role: user.role,
     isActive: user.isActive,
+    telefono: user.telefono,
+    direccion: user.direccion,
+    ciudad: user.ciudad,
+    estado: user.estado,
+    codigoPostal: user.codigoPostal,
     createdAt: user.createdAt,
   }
 }
@@ -91,15 +101,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    const session = sessionStorage.getItem("urban-hat-session")
-    if (session) {
+    const hydrateAuth = async () => {
       try {
-        setUser(JSON.parse(session))
+        const response = await fetch("/api/v1/auth/me")
+        const payload = (await response.json()) as ApiResponse<UserApi>
+
+        if (response.ok && payload.success && payload.data) {
+          const userData = mapApiUserToAuthUser(payload.data)
+          setUser(userData)
+          sessionStorage.setItem("urban-hat-session", JSON.stringify(userData))
+          setIsLoading(false)
+          return
+        }
       } catch {
-        sessionStorage.removeItem("urban-hat-session")
+        // fallback a sesión local
       }
+
+      const session = sessionStorage.getItem("urban-hat-session")
+      if (session) {
+        try {
+          setUser(JSON.parse(session))
+        } catch {
+          sessionStorage.removeItem("urban-hat-session")
+        }
+      }
+
+      setIsLoading(false)
     }
-    setIsLoading(false)
+
+    hydrateAuth()
   }, [])
 
   const login = async (email: string, password: string) => {
@@ -120,7 +150,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(userData)
       sessionStorage.setItem("urban-hat-session", JSON.stringify(userData))
 
-      return { success: true }
+      return { success: true, role: userData.role }
     } catch {
       return { success: false, error: "No se pudo conectar con el servidor" }
     }

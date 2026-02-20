@@ -43,15 +43,15 @@ Dejar API consistente para consumir desde Kotlin sin romper integración.
 
 ### Checklist
 - [ ] Confirmar contrato JSON único para todas las rutas (`{ success, data, error }`).
-- [ ] Documentar ejemplos request/response reales de:
+- [x] Documentar ejemplos request/response reales de:
   - `POST /api/v1/auth/login`
   - `POST /api/v1/auth/register`
   - `GET /api/v1/products`
   - `GET/POST /api/v1/orders`
-- [ ] Definir estrategia de autenticación móvil inicial:
-  - MVP: header `x-user-id` (actual)
-  - Evolución recomendada: JWT corto + refresh
-- [ ] Agregar endpoint `GET /api/v1/auth/me` (opcional recomendado para app móvil).
+- [x] Definir estrategia de autenticación móvil inicial:
+  - JWT bearer como principal
+  - `x-user-id` como compatibilidad MVP
+- [x] Agregar endpoint `GET /api/v1/auth/me`.
 
 ### Entregable
 - Documento de integración Android actualizado + endpoints probados.
@@ -81,7 +81,7 @@ Blindar rutas y separar claramente permisos.
 
 ### Checklist
 - [x] Middleware base para rutas sensibles (`/cuenta`, `/api/v1/orders`) y control de rol en `/admin` cuando hay sesión backend.
-- [ ] Reglas por rol en servicios (no solo en frontend).
+- [x] Reglas por rol en servicios (no solo en frontend).
 - [ ] Sanitizar respuestas para nunca exponer `password`.
 - [ ] Rate limit básico en auth para evitar abuso.
 
@@ -131,6 +131,22 @@ Sí, puedes borrar la base cuando quieras y Mongoose no se rompe por eso.
 
 ---
 
+## Variables de entorno requeridas
+
+```env
+MONGODB_URI=
+JWT_SECRET=
+ADMIN_SEED_KEY=
+SUPERADMIN_EMAIL=
+SUPERADMIN_PASSWORD=
+SUPERADMIN_NAME=Super Admin
+```
+
+- `ADMIN_SEED_KEY`: API key para ejecutar `POST /api/v1/admin/seed-superadmin`.
+- `JWT_SECRET`: clave para firmar/verificar tokens JWT en móvil/API.
+
+---
+
 ## Decisiones recomendadas para el proyecto escolar
 
 ### 1) Registro de vendedores
@@ -149,3 +165,7 @@ Sí, puedes borrar la base cuando quieras y Mongoose no se rompe por eso.
 - Sí, **Cloudinary Free** es buena opción para proyecto escolar.
 - Ventajas: CDN, transformaciones, URLs estables, menor carga en backend.
 - En UrbanHat, guardar solo la URL final en `Product.imageUrl`.
+
+### 4) Pagos sandbox
+- Se acepta uso de **Stripe en modo test/sandbox** para simular compras.
+- No guardar datos sensibles de tarjeta; usar checkout/session de Stripe.

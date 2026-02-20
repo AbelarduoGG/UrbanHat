@@ -17,12 +17,17 @@
 ## 3) Seguridad (enfoque escolar/MVP)
 
 - **Web:** sesión por cookie HTTPOnly en login/register.
-- **Móvil:** autenticación temporal por header `x-user-id`.
+- **Móvil:** JWT bearer (`Authorization`) como principal y `x-user-id` como compatibilidad.
 - **Middleware:**
   - protege `/cuenta` (requiere sesión)
-  - valida autenticación para `/api/v1/orders` (cookie o `x-user-id`)
   - aplica control de rol en `/admin` cuando existe sesión backend.
 - Roles permitidos: `superadmin`, `seller`, `buyer`.
+
+## 3.1) Alta de vendedores
+
+- Registro público permitido solo para `buyer`.
+- Los usuarios `seller` se registran únicamente por flujo administrativo.
+- Solo `superadmin` puede crear vendedores.
 
 ## 4) Separación de responsabilidades
 
@@ -30,8 +35,15 @@
 - **Web admin/seller:** gestión de productos, ventas e inventario.
 - Backend debe mantener la lógica en servicios (`lib/services/*`), no en vistas React.
 
+## 4.1) Dirección de envío
+
+- La dirección del comprador se persiste en colección `User` (MongoDB).
+- Solo `buyer` puede editar su dirección.
+- Campos mínimos: `direccion`, `ciudad`, `estado`, `codigoPostal`.
+
 ## 5) Restricciones del proyecto
 
-- No integrar pasarela de pagos real en esta etapa.
+- Pasarela permitida en modo **sandbox** para simulación académica.
+- Proveedor recomendado para MVP: **Stripe test mode**.
 - Imágenes de productos se manejan como URL.
 - Evitar features fuera de alcance académico/MVP.

@@ -6,6 +6,11 @@ export interface IUser extends Document {
   password: string
   role: "superadmin" | "seller" | "buyer"
   shopName?: string
+  telefono?: string
+  direccion?: string
+  ciudad?: string
+  estado?: string
+  codigoPostal?: string
   isActive: boolean
   createdAt: Date
 }
@@ -20,6 +25,11 @@ const UserSchema = new Schema<IUser>({
     default: "buyer",
   },
   shopName: { type: String },
+  telefono: { type: String },
+  direccion: { type: String },
+  ciudad: { type: String },
+  estado: { type: String },
+  codigoPostal: { type: String },
   isActive: { type: Boolean, default: true },
   createdAt: { type: Date, default: Date.now },
 })

@@ -1,9 +1,9 @@
-# 03. API Endpoints (Contrato para App Android)
+# 03. API Endpoints (Contrato para App Android + Web Admin)
 
 **Base URL local:** `http://localhost:3000/api/v1`  
 **Base URL producción:** `https://tu-dominio.vercel.app/api/v1`
 
-Todas las respuestas siguen el formato:
+Formato estándar de respuesta:
 
 ```json
 { "success": true, "data": {}, "error": "" }
@@ -14,15 +14,14 @@ Todas las respuestas siguen el formato:
 ## 1) Autenticación
 
 ### POST `/auth/register`
-Crea un comprador para usar la app móvil/web.
+Registro público solo para compradores (`buyer`).
 
 **Body**
 ```json
 {
   "name": "Juan Perez",
   "email": "juan@email.com",
-  "password": "secreto123",
-  "role": "buyer"
+  "password": "secreto123"
 }
 ```
 
@@ -36,13 +35,14 @@ Crea un comprador para usar la app móvil/web.
     "email": "juan@email.com",
     "role": "buyer",
     "isActive": true,
-    "createdAt": "2026-02-18T..."
+    "createdAt": "2026-02-18T...",
+    "token": "jwt..."
   }
 }
 ```
 
 ### POST `/auth/login`
-Inicia sesión para web (cookie HTTPOnly) y también devuelve datos para móvil.
+Login para web (cookie HTTPOnly) y móvil (JWT).
 
 **Body**
 ```json
@@ -62,105 +62,82 @@ Inicia sesión para web (cookie HTTPOnly) y también devuelve datos para móvil.
     "email": "juan@email.com",
     "role": "buyer",
     "isActive": true,
-    "createdAt": "2026-02-18T..."
+    "createdAt": "2026-02-18T...",
+    "token": "jwt..."
   }
 }
 ```
 
-### POST `/auth/logout`
-Solo para web. Limpia cookie de sesión.
+### GET `/auth/me`
+Devuelve el usuario autenticado (cookie o bearer token).
 
-**Response 200**
-```json
-{
-  "success": true
-}
-```
+### POST `/auth/logout`
+Limpia cookie web.
 
 ---
 
-## 2) Productos (Catálogo móvil)
+## 2) Productos (catálogo móvil)
 
 ### GET `/products`
-Obtiene productos activos para mostrar en catálogo.
-
-**Response 200**
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": "65f...",
-      "sellerId": "65e...",
-      "name": "Snapback Negra",
-      "description": "...",
-      "price": 549,
-      "stock": 10,
-      "imageUrl": "https://...",
-      "category": "Snapback",
-      "isActive": true
-    }
-  ]
-}
-```
+Lista productos activos.
 
 ---
 
-## 3) Órdenes (Compras móvil)
+## 3) Órdenes (compras móvil)
 
 ### POST `/orders`
-Crea una orden y descuenta stock.
+### GET `/orders`
 
-**Autenticación MVP Android:** Header `x-user-id`  
-**Autenticación web:** cookie de sesión
+Autenticación aceptada (prioridad):
+1. Cookie de sesión web
+2. `Authorization: Bearer <jwt>`
+3. `x-user-id` (MVP escolar / compatibilidad)
+
+---
+
+## 4) Endpoints administrativos
+
+### POST `/admin/seed-superadmin`
+Crea superadmin único (si no existe).
+
+- Header requerido: `x-seed-key`
+- Debe coincidir con `ADMIN_SEED_KEY` en `.env.local`
+- Usa `SUPERADMIN_EMAIL`, `SUPERADMIN_PASSWORD`, `SUPERADMIN_NAME`
+
+### POST `/admin/sellers`
+Registra vendedor. Solo `superadmin`.
 
 **Body**
 ```json
 {
-  "items": [
-    { "productId": "65f...", "quantity": 2 }
-  ]
+  "name": "Tienda Centro",
+  "email": "seller@urbanhat.com",
+  "password": "pass1234",
+  "shopName": "Centro Caps"
 }
 ```
 
-**Response 201**
+### POST `/admin/change-password`
+Cambia contraseña del usuario autenticado (incluido superadmin).
+
+**Body**
 ```json
 {
-  "success": true,
-  "data": {
-    "orderId": "660..."
-  }
-}
-```
-
-### GET `/orders`
-Lista órdenes del comprador autenticado.
-
-**Autenticación MVP Android:** Header `x-user-id`  
-**Autenticación web:** cookie de sesión
-
-**Response 200**
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "_id": "660...",
-      "buyerId": "65f...",
-      "items": [],
-      "totalAmount": 1098,
-      "status": "paid",
-      "createdAt": "2026-02-18T..."
-    }
-  ]
+  "currentPassword": "actual123",
+  "newPassword": "nueva123"
 }
 ```
 
 ---
 
-## 4) Notas de integración
+## 5) Flujo recomendado
 
-1. La app móvil de comprador consume `products` + `orders` + `auth`.
-2. La web administrativa se mantiene separada para gestión (admin/seller).
-3. El middleware actual protege `/cuenta` por cookie y valida autenticación en `/orders`.
-4. Para versión escolar, `x-user-id` es suficiente en Android; en una iteración futura se migra a JWT.
+### Móvil comprador
+- Login -> guardar `token`
+- Consumir `/products`
+- Crear y listar `/orders` con `Authorization: Bearer <token>`
+
+### Web admin/seller
+- Login web -> cookie HTTPOnly
+- Dashboard en `/admin`
+- Gestión de vendedores desde endpoints admin (superadmin)

@@ -3,6 +3,7 @@ import { loginSchema } from "@/lib/validations/auth.schema"
 import { validateUserCredentials } from "@/lib/services/auth.service"
 import type { ApiResponse, UserPublic } from "@/lib/types"
 import { AUTH_COOKIE_NAME, serializeSession } from "@/lib/auth/session"
+import { signAuthToken } from "@/lib/auth/jwt"
 
 type AuthUser = {
   _id: { toString: () => string }
@@ -55,8 +56,15 @@ export async function POST(req: NextRequest) {
       createdAt: user.createdAt.toISOString(),
     }
 
-    const response = NextResponse.json<ApiResponse<UserPublic>>(
-      { success: true, data: userPublic },
+    const token = signAuthToken({
+      sub: user._id.toString(),
+      email: user.email,
+      role: user.role,
+      name: user.name,
+    })
+
+    const response = NextResponse.json<ApiResponse<UserPublic & { token: string }>>(
+      { success: true, data: { ...userPublic, token } },
       { status: 200 }
     )
 

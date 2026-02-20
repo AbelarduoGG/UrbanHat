@@ -23,9 +23,6 @@ import {
 } from "lucide-react"
 import { defaultProducts, categories, type Product } from "@/lib/products"
 
-const ADMIN_USER = "admin"
-const ADMIN_PASS = "urban2026"
-
 export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [username, setUsername] = useState("")
@@ -59,8 +56,30 @@ export default function AdminPage() {
         setProducts(defaultProducts)
       }
     }
-    const session = sessionStorage.getItem("urban-hat-admin")
-    if (session === "true") setIsAuthenticated(true)
+
+    const verifySession = async () => {
+      try {
+        const response = await fetch("/api/v1/auth/me")
+        const payload = await response.json()
+
+        if (
+          response.ok &&
+          payload?.success &&
+          (payload.data?.role === "seller" || payload.data?.role === "superadmin")
+        ) {
+          setIsAuthenticated(true)
+          sessionStorage.setItem("urban-hat-admin", "true")
+          return
+        }
+      } catch {
+        // no-op
+      }
+
+      setIsAuthenticated(false)
+      sessionStorage.removeItem("urban-hat-admin")
+    }
+
+    verifySession()
   }, [])
 
   const saveProducts = (updated: Product[]) => {
@@ -68,18 +87,42 @@ export default function AdminPage() {
     localStorage.setItem("urban-hat-products", JSON.stringify(updated))
   }
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (username === ADMIN_USER && password === ADMIN_PASS) {
-      setIsAuthenticated(true)
-      sessionStorage.setItem("urban-hat-admin", "true")
-      setLoginError("")
-    } else {
-      setLoginError("Credenciales incorrectas")
+
+    try {
+      const response = await fetch("/api/v1/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: username, password }),
+      })
+
+      const payload = await response.json()
+
+      if (
+        response.ok &&
+        payload?.success &&
+        (payload.data?.role === "seller" || payload.data?.role === "superadmin")
+      ) {
+        setIsAuthenticated(true)
+        sessionStorage.setItem("urban-hat-admin", "true")
+        setLoginError("")
+        return
+      }
+
+      setLoginError(payload?.error || "Credenciales incorrectas")
+    } catch {
+      setLoginError("No se pudo conectar con el servidor")
     }
   }
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/v1/auth/logout", { method: "POST" })
+    } catch {
+      // no-op
+    }
+
     setIsAuthenticated(false)
     sessionStorage.removeItem("urban-hat-admin")
   }
