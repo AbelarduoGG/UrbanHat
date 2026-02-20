@@ -18,11 +18,14 @@ export interface UserPublic {
 export interface ProductPublic {
   id: string
   sellerId: string
+  sellerName: string
   name: string
+  brand: string
   description: string
   price: number
   stock: number
   imageUrl: string
+  imageUrls: string[]
   category: string
   isActive: boolean
 }

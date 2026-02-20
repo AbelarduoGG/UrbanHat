@@ -50,7 +50,7 @@ export function ProductModal({ product, onClose }: ProductModalProps) {
         {/* Image */}
         <div className="relative aspect-square">
           <Image
-            src={product.image || "/placeholder.svg"}
+            src={product.images?.[0] || product.image || "/placeholder.svg"}
             alt={product.name}
             fill
             className="object-cover"
@@ -68,6 +68,8 @@ export function ProductModal({ product, onClose }: ProductModalProps) {
           <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
             {product.description}
           </p>
+          <p className="mt-2 text-xs text-muted-foreground">Marca: {product.brand}</p>
+          <p className="text-xs text-muted-foreground">Vendedor: {product.sellerName}</p>
           <p className="mt-6 font-display text-3xl font-bold text-foreground">
             ${product.price} MXN
           </p>

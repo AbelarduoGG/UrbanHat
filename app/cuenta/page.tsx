@@ -155,6 +155,14 @@ export default function AccountPage() {
             </span>
           </Link>
           <div className="flex items-center gap-4">
+            {(user.role === "superadmin" || user.role === "seller") && (
+              <Link
+                href="/admin"
+                className="text-sm font-medium uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground"
+              >
+                Ir al panel
+              </Link>
+            )}
             <Link
               href="/"
               className="flex items-center gap-2 text-sm font-medium uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground"

@@ -11,52 +11,57 @@ import { defaultProducts, type Product } from "./products"
 
 interface ProductsContextType {
   products: Product[]
-  updateProduct: (id: number, updates: Partial<Product>) => void
-  addProduct: (product: Product) => void
-  deleteProduct: (id: number) => void
+  isLoading: boolean
+  refreshProducts: () => Promise<void>
 }
 
 const ProductsContext = createContext<ProductsContextType | undefined>(undefined)
 
 export function ProductsProvider({ children }: { children: ReactNode }) {
   const [products, setProducts] = useState<Product[]>(defaultProducts)
-  const [loaded, setLoaded] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
 
-  useEffect(() => {
-    const stored = localStorage.getItem("urban-hat-products")
-    if (stored) {
-      try {
-        setProducts(JSON.parse(stored))
-      } catch {
-        setProducts(defaultProducts)
+  const refreshProducts = async () => {
+    try {
+      const response = await fetch("/api/v1/products")
+      const payload = await response.json()
+
+      if (!response.ok || !payload?.success || !Array.isArray(payload?.data)) {
+        setProducts([])
+        return
       }
+
+      const mapped: Product[] = payload.data.map((item: Record<string, unknown>) => ({
+        id: String(item.id ?? ""),
+        sellerId: String(item.sellerId ?? ""),
+        sellerName: String(item.sellerName ?? "Vendedor"),
+        name: String(item.name ?? ""),
+        brand: String(item.brand ?? "Sin marca"),
+        price: Number(item.price ?? 0),
+        image: String(item.imageUrl ?? "/placeholder.svg"),
+        images: Array.isArray(item.imageUrls)
+          ? item.imageUrls.map((url) => String(url))
+          : [String(item.imageUrl ?? "/placeholder.svg")],
+        category: String(item.category ?? "General"),
+        description: String(item.description ?? ""),
+        stock: Number(item.stock ?? 0),
+      }))
+
+      setProducts(mapped)
+    } catch {
+      setProducts([])
+    } finally {
+      setIsLoading(false)
     }
-    setLoaded(true)
-  }, [])
+  }
 
   useEffect(() => {
-    if (loaded) {
-      localStorage.setItem("urban-hat-products", JSON.stringify(products))
-    }
-  }, [products, loaded])
-
-  const updateProduct = (id: number, updates: Partial<Product>) => {
-    setProducts((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, ...updates } : p))
-    )
-  }
-
-  const addProduct = (product: Product) => {
-    setProducts((prev) => [...prev, product])
-  }
-
-  const deleteProduct = (id: number) => {
-    setProducts((prev) => prev.filter((p) => p.id !== id))
-  }
+    refreshProducts()
+  }, [])
 
   return (
     <ProductsContext.Provider
-      value={{ products, updateProduct, addProduct, deleteProduct }}
+      value={{ products, isLoading, refreshProducts }}
     >
       {children}
     </ProductsContext.Provider>

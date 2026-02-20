@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { LogOut, Save, Trash2, UserPlus } from "lucide-react"
+import { Loader2, LogOut, Save, Trash2, Upload, UserPlus } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 
 type Role = "superadmin" | "seller" | "buyer"
@@ -31,11 +31,14 @@ interface AdminUser {
 interface SellerProduct {
   id: string
   name: string
+  brand: string
   description: string
   price: number
   stock: number
   imageUrl: string
+  imageUrls: string[]
   category: string
+  sellerName: string
   isActive: boolean
 }
 
@@ -45,13 +48,30 @@ interface ApiResponse<T = unknown> {
   error?: string
 }
 
-const emptyProduct = {
+interface ProductForm {
+  name: string
+  brand: string
+  description: string
+  price: number
+  stock: number
+  imageUrls: string[]
+  category: string
+}
+
+const emptyProduct: ProductForm = {
   name: "",
+  brand: "",
   description: "",
   price: 0,
   stock: 0,
-  imageUrl: "",
+  imageUrls: ["", "", ""],
   category: "General",
+}
+
+function roleLabel(role: Role) {
+  if (role === "superadmin") return "Administrador"
+  if (role === "seller") return "Vendedor"
+  return "Cliente"
 }
 
 export default function AdminPage() {
@@ -59,6 +79,7 @@ export default function AdminPage() {
   const { logout } = useAuth()
   const [isLoading, setIsLoading] = useState(true)
   const [me, setMe] = useState<MeUser | null>(null)
+  const [message, setMessage] = useState("")
 
   const [users, setUsers] = useState<AdminUser[]>([])
   const [sellerForm, setSellerForm] = useState({
@@ -69,12 +90,13 @@ export default function AdminPage() {
   })
 
   const [products, setProducts] = useState<SellerProduct[]>([])
-  const [productForm, setProductForm] = useState(emptyProduct)
+  const [productForm, setProductForm] = useState<ProductForm>(emptyProduct)
   const [editingProductId, setEditingProductId] = useState<string | null>(null)
+  const [uploadingIndex, setUploadingIndex] = useState<number | null>(null)
 
   const title = useMemo(() => {
-    if (me?.role === "superadmin") return "Panel Superadmin"
-    if (me?.role === "seller") return "Panel Vendedor"
+    if (me?.role === "superadmin") return "Panel de administración"
+    if (me?.role === "seller") return "Panel de vendedor"
     return "Panel"
   }, [me?.role])
 
@@ -140,6 +162,7 @@ export default function AdminPage() {
 
   const handleCreateSeller = async (e: React.FormEvent) => {
     e.preventDefault()
+    setMessage("")
 
     const response = await fetch("/api/v1/admin/sellers", {
       method: "POST",
@@ -148,9 +171,14 @@ export default function AdminPage() {
     })
 
     const payload = (await response.json()) as ApiResponse
-    if (!response.ok || !payload.success) return
+
+    if (!response.ok || !payload.success) {
+      setMessage(payload.error || "No se pudo crear el vendedor")
+      return
+    }
 
     setSellerForm({ name: "", email: "", password: "", shopName: "" })
+    setMessage("Vendedor creado correctamente")
     await refreshUsers()
   }
 
@@ -158,6 +186,7 @@ export default function AdminPage() {
     userId: string,
     data: { role?: "buyer" | "seller"; isActive?: boolean }
   ) => {
+    setMessage("")
     const response = await fetch(`/api/v1/admin/users/${userId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -165,13 +194,60 @@ export default function AdminPage() {
     })
 
     const payload = (await response.json()) as ApiResponse
-    if (!response.ok || !payload.success) return
+    if (!response.ok || !payload.success) {
+      setMessage(payload.error || "No se pudo actualizar el usuario")
+      return
+    }
 
     await refreshUsers()
   }
 
+  const setImageAtIndex = (index: number, url: string) => {
+    setProductForm((prev) => {
+      const next = [...prev.imageUrls]
+      next[index] = url
+      return { ...prev, imageUrls: next }
+    })
+  }
+
+  const uploadImage = async (file: File, index: number) => {
+    setMessage("")
+    setUploadingIndex(index)
+
+    try {
+      const uploadData = new FormData()
+      uploadData.append("file", file)
+
+      const response = await fetch("/api/v1/uploads/image", {
+        method: "POST",
+        body: uploadData,
+      })
+
+      const payload = (await response.json()) as ApiResponse<{ url: string }>
+
+      if (!response.ok || !payload.success || !payload.data?.url) {
+        setMessage(payload.error || "No se pudo subir la imagen")
+        return
+      }
+
+      setImageAtIndex(index, payload.data.url)
+      setMessage("Imagen subida correctamente")
+    } catch {
+      setMessage("No se pudo subir la imagen")
+    } finally {
+      setUploadingIndex(null)
+    }
+  }
+
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault()
+    setMessage("")
+
+    const validImages = productForm.imageUrls.filter(Boolean)
+    if (validImages.length === 0) {
+      setMessage("Debes subir al menos una imagen")
+      return
+    }
 
     const endpoint = editingProductId
       ? `/api/v1/products/${editingProductId}`
@@ -182,24 +258,35 @@ export default function AdminPage() {
     const response = await fetch(endpoint, {
       method,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(productForm),
+      body: JSON.stringify({
+        ...productForm,
+        imageUrls: validImages,
+      }),
     })
 
     const payload = (await response.json()) as ApiResponse
-    if (!response.ok || !payload.success) return
+    if (!response.ok || !payload.success) {
+      setMessage(payload.error || "No se pudo guardar la gorra")
+      return
+    }
 
     setProductForm(emptyProduct)
     setEditingProductId(null)
+    setMessage(editingProductId ? "Gorra actualizada" : "Gorra creada")
     await refreshMyProducts()
   }
 
   const handleDeleteProduct = async (productId: string) => {
+    setMessage("")
     const response = await fetch(`/api/v1/products/${productId}`, {
       method: "DELETE",
     })
 
     const payload = (await response.json()) as ApiResponse
-    if (!response.ok || !payload.success) return
+    if (!response.ok || !payload.success) {
+      setMessage(payload.error || "No se pudo eliminar la gorra")
+      return
+    }
 
     await refreshMyProducts()
   }
@@ -227,7 +314,7 @@ export default function AdminPage() {
               href="/"
               className="border border-border px-4 py-2 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground"
             >
-              Tienda
+              Ir a tienda
             </Link>
             <button
               type="button"
@@ -239,6 +326,12 @@ export default function AdminPage() {
             </button>
           </div>
         </div>
+
+        {message && (
+          <div className="mb-6 border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
+            {message}
+          </div>
+        )}
 
         {me.role === "superadmin" && (
           <div className="grid gap-6 lg:grid-cols-3">
@@ -253,7 +346,7 @@ export default function AdminPage() {
                 <input
                   value={sellerForm.name}
                   onChange={(e) =>
-                    setSellerForm((p) => ({ ...p, name: e.target.value }))
+                    setSellerForm((prev) => ({ ...prev, name: e.target.value }))
                   }
                   className="w-full border border-border bg-background px-3 py-2 text-sm"
                   placeholder="Nombre"
@@ -262,30 +355,30 @@ export default function AdminPage() {
                 <input
                   value={sellerForm.email}
                   onChange={(e) =>
-                    setSellerForm((p) => ({ ...p, email: e.target.value }))
+                    setSellerForm((prev) => ({ ...prev, email: e.target.value }))
                   }
                   className="w-full border border-border bg-background px-3 py-2 text-sm"
-                  placeholder="Email"
+                  placeholder="Correo"
                   type="email"
                   required
                 />
                 <input
                   value={sellerForm.password}
                   onChange={(e) =>
-                    setSellerForm((p) => ({ ...p, password: e.target.value }))
+                    setSellerForm((prev) => ({ ...prev, password: e.target.value }))
                   }
                   className="w-full border border-border bg-background px-3 py-2 text-sm"
-                  placeholder="Password"
+                  placeholder="Contraseña"
                   type="password"
                   required
                 />
                 <input
                   value={sellerForm.shopName}
                   onChange={(e) =>
-                    setSellerForm((p) => ({ ...p, shopName: e.target.value }))
+                    setSellerForm((prev) => ({ ...prev, shopName: e.target.value }))
                   }
                   className="w-full border border-border bg-background px-3 py-2 text-sm"
-                  placeholder="Tienda"
+                  placeholder="Nombre de tienda"
                   required
                 />
               </div>
@@ -294,7 +387,7 @@ export default function AdminPage() {
                 className="mt-4 flex w-full items-center justify-center gap-2 bg-accent py-2 text-xs font-bold uppercase tracking-wider text-accent-foreground"
               >
                 <UserPlus className="h-4 w-4" />
-                Crear seller
+                Crear vendedor
               </button>
             </form>
 
@@ -315,7 +408,7 @@ export default function AdminPage() {
                         <p className="text-sm font-bold text-foreground">{user.name}</p>
                         <p className="text-xs text-muted-foreground">{user.email}</p>
                         <p className="text-xs text-muted-foreground">
-                          Rol: {user.role} {user.shopName ? `• ${user.shopName}` : ""}
+                          Rol: {roleLabel(user.role)} {user.shopName ? `• ${user.shopName}` : ""}
                         </p>
                       </div>
 
@@ -342,7 +435,9 @@ export default function AdminPage() {
                               }
                               className="border border-border px-3 py-1 text-xs font-bold uppercase"
                             >
-                              {user.role === "seller" ? "Pasar a buyer" : "Pasar a seller"}
+                              {user.role === "seller"
+                                ? "Pasar a cliente"
+                                : "Pasar a vendedor"}
                             </button>
                           </>
                         )}
@@ -369,60 +464,111 @@ export default function AdminPage() {
                 <input
                   value={productForm.name}
                   onChange={(e) =>
-                    setProductForm((p) => ({ ...p, name: e.target.value }))
+                    setProductForm((prev) => ({ ...prev, name: e.target.value }))
                   }
                   className="w-full border border-border bg-background px-3 py-2 text-sm"
                   placeholder="Nombre"
                   required
                 />
+
                 <input
+                  value={productForm.brand}
+                  onChange={(e) =>
+                    setProductForm((prev) => ({ ...prev, brand: e.target.value }))
+                  }
+                  className="w-full border border-border bg-background px-3 py-2 text-sm"
+                  placeholder="Marca"
+                  required
+                />
+
+                <textarea
                   value={productForm.description}
                   onChange={(e) =>
-                    setProductForm((p) => ({ ...p, description: e.target.value }))
+                    setProductForm((prev) => ({ ...prev, description: e.target.value }))
                   }
                   className="w-full border border-border bg-background px-3 py-2 text-sm"
                   placeholder="Descripción"
+                  rows={3}
                 />
-                <input
-                  value={productForm.imageUrl}
-                  onChange={(e) =>
-                    setProductForm((p) => ({ ...p, imageUrl: e.target.value }))
-                  }
-                  className="w-full border border-border bg-background px-3 py-2 text-sm"
-                  placeholder="URL imagen (Cloudinary)"
-                  required
-                />
+
                 <input
                   type="number"
                   value={productForm.price}
                   onChange={(e) =>
-                    setProductForm((p) => ({ ...p, price: Number(e.target.value) }))
+                    setProductForm((prev) => ({ ...prev, price: Number(e.target.value) }))
                   }
                   className="w-full border border-border bg-background px-3 py-2 text-sm"
                   placeholder="Precio"
                   min={0}
                   required
                 />
+
                 <input
                   type="number"
                   value={productForm.stock}
                   onChange={(e) =>
-                    setProductForm((p) => ({ ...p, stock: Number(e.target.value) }))
+                    setProductForm((prev) => ({ ...prev, stock: Number(e.target.value) }))
                   }
                   className="w-full border border-border bg-background px-3 py-2 text-sm"
-                  placeholder="Stock"
+                  placeholder="Inventario"
                   min={0}
                   required
                 />
+
                 <input
                   value={productForm.category}
                   onChange={(e) =>
-                    setProductForm((p) => ({ ...p, category: e.target.value }))
+                    setProductForm((prev) => ({ ...prev, category: e.target.value }))
                   }
                   className="w-full border border-border bg-background px-3 py-2 text-sm"
                   placeholder="Categoría"
                   required
                 />
+
+                <div className="space-y-2">
+                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Imágenes del producto (máximo 3)
+                  </p>
+
+                  {[0, 1, 2].map((index) => (
+                    <div key={index} className="border border-border p-2">
+                      <label className="mb-2 block text-xs text-muted-foreground">
+                        Imagen {index + 1}
+                      </label>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="mb-2 block w-full text-xs text-muted-foreground"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0]
+                          if (file) {
+                            uploadImage(file, index)
+                          }
+                        }}
+                      />
+
+                      {uploadingIndex === index && (
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          Subiendo imagen...
+                        </div>
+                      )}
+
+                      {productForm.imageUrls[index] && (
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="truncate text-xs text-foreground">Imagen cargada</p>
+                          <button
+                            type="button"
+                            onClick={() => setImageAtIndex(index, "")}
+                            className="text-xs font-medium text-destructive"
+                          >
+                            Quitar
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
 
               <button
@@ -439,6 +585,12 @@ export default function AdminPage() {
                 Mis gorras
               </h2>
 
+              {products.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  Aún no tienes productos. Crea tu primera gorra para publicarla en la tienda.
+                </p>
+              )}
+
               <div className="space-y-3">
                 {products.map((product) => (
                   <div
@@ -448,7 +600,7 @@ export default function AdminPage() {
                     <div>
                       <p className="text-sm font-bold text-foreground">{product.name}</p>
                       <p className="text-xs text-muted-foreground">
-                        {product.category} • Stock: {product.stock} • ${product.price} MXN
+                        {product.brand} • {product.category} • Stock: {product.stock} • ${product.price} MXN
                       </p>
                     </div>
 
@@ -459,10 +611,15 @@ export default function AdminPage() {
                           setEditingProductId(product.id)
                           setProductForm({
                             name: product.name,
+                            brand: product.brand,
                             description: product.description,
                             price: product.price,
                             stock: product.stock,
-                            imageUrl: product.imageUrl,
+                            imageUrls: [
+                              product.imageUrls[0] || "",
+                              product.imageUrls[1] || "",
+                              product.imageUrls[2] || "",
+                            ],
                             category: product.category,
                           })
                         }}
@@ -481,6 +638,16 @@ export default function AdminPage() {
                     </div>
                   </div>
                 ))}
+              </div>
+
+              <div className="mt-4 border-t border-border pt-4">
+                <Link
+                  href="/"
+                  className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground"
+                >
+                  <Upload className="h-3 w-3" />
+                  Ver mis productos en la tienda
+                </Link>
               </div>
             </div>
           </div>

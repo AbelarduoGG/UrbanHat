@@ -37,7 +37,14 @@ export async function PATCH(req: NextRequest, context: RouteParams) {
       )
     }
 
-    const product = await updateProduct(id, auth.userId, parsed.data)
+    const updates = {
+      ...parsed.data,
+      ...(parsed.data.imageUrls?.length
+        ? { imageUrl: parsed.data.imageUrls[0] }
+        : {}),
+    }
+
+    const product = await updateProduct(id, auth.userId, updates)
 
     if (!product) {
       return NextResponse.json<ApiResponse>(
@@ -49,7 +56,21 @@ export async function PATCH(req: NextRequest, context: RouteParams) {
       )
     }
 
-    return NextResponse.json<ApiResponse>({ success: true, data: product }, { status: 200 })
+    return NextResponse.json<ApiResponse>(
+      {
+        success: true,
+        data: {
+          ...product,
+          imageUrl: product?.imageUrls?.[0] || product?.imageUrl,
+          imageUrls: product?.imageUrls?.length
+            ? product.imageUrls
+            : product?.imageUrl
+              ? [product.imageUrl]
+              : [],
+        },
+      },
+      { status: 200 }
+    )
   } catch (error) {
     console.error("[PATCH /api/v1/products/:id]", error)
     return NextResponse.json<ApiResponse>(

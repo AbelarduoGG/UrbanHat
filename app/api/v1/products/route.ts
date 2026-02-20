@@ -8,6 +8,13 @@ import {
 import type { ApiResponse, ProductPublic } from "@/lib/types"
 import { getRequestAuth } from "@/lib/auth/request-auth"
 
+function resolveSellerName(seller: unknown) {
+  if (!seller || typeof seller !== "object") return "Vendedor"
+
+  const maybe = seller as { name?: string; shopName?: string }
+  return maybe.shopName || maybe.name || "Vendedor"
+}
+
 /**
  * GET /api/v1/products
  * Lista todos los productos activos (para la app móvil).
@@ -39,12 +46,19 @@ export async function GET(_req: NextRequest) {
 
     const data: ProductPublic[] = products.map((p) => ({
       id: p._id.toString(),
-      sellerId: p.sellerId.toString(),
+      sellerId:
+        typeof p.sellerId === "string"
+          ? p.sellerId
+          : (p.sellerId as { _id?: { toString(): string } })._id?.toString() ||
+            p.sellerId.toString(),
+      sellerName: resolveSellerName(p.sellerId),
       name: p.name,
+      brand: p.brand || "Sin marca",
       description: p.description || "",
       price: p.price,
       stock: p.stock,
-      imageUrl: p.imageUrl,
+      imageUrl: p.imageUrls?.[0] || p.imageUrl,
+      imageUrls: p.imageUrls?.length ? p.imageUrls : [p.imageUrl],
       category: p.category,
       isActive: p.isActive,
     }))
@@ -96,6 +110,7 @@ export async function POST(req: NextRequest) {
 
     const product = await createProduct({
       ...parsed.data,
+      imageUrl: parsed.data.imageUrls[0],
       sellerId: auth.userId,
       isActive: true,
     })
@@ -106,11 +121,14 @@ export async function POST(req: NextRequest) {
         data: {
           id: product._id.toString(),
           sellerId: product.sellerId.toString(),
+          sellerName: "Vendedor",
           name: product.name,
+          brand: product.brand,
           description: product.description,
           price: product.price,
           stock: product.stock,
           imageUrl: product.imageUrl,
+          imageUrls: product.imageUrls,
           category: product.category,
           isActive: product.isActive,
         },

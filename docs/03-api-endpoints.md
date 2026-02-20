@@ -81,6 +81,73 @@ Limpia cookie web.
 ### GET `/products`
 Lista productos activos.
 
+**Response 200 (resumen)**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "65f...",
+      "sellerId": "65a...",
+      "sellerName": "Caps Centro",
+      "name": "Gorra Negra Premium",
+      "brand": "Urban Hat",
+      "description": "Visera plana",
+      "price": 499,
+      "stock": 10,
+      "imageUrl": "https://res.cloudinary.com/.../img1.jpg",
+      "imageUrls": [
+        "https://res.cloudinary.com/.../img1.jpg",
+        "https://res.cloudinary.com/.../img2.jpg"
+      ],
+      "category": "Snapback",
+      "isActive": true
+    }
+  ]
+}
+```
+
+### GET `/products?mine=true`
+Lista productos del vendedor autenticado.
+
+### POST `/products`
+Crea producto para el vendedor autenticado.
+
+**Body**
+```json
+{
+  "name": "Gorra Negra Premium",
+  "brand": "Urban Hat",
+  "description": "Visera plana",
+  "price": 499,
+  "stock": 10,
+  "imageUrls": [
+    "https://res.cloudinary.com/.../img1.jpg",
+    "https://res.cloudinary.com/.../img2.jpg"
+  ],
+  "category": "Snapback"
+}
+```
+
+### PATCH `/products/:id`
+Actualiza producto del vendedor dueño.
+
+### DELETE `/products/:id`
+Desactiva (soft delete) un producto del vendedor dueño.
+
+### POST `/uploads/image`
+Sube imagen a Cloudinary desde archivo (`multipart/form-data`, campo `file`).
+
+**Response 200**
+```json
+{
+  "success": true,
+  "data": {
+    "url": "https://res.cloudinary.com/.../imagen.jpg"
+  }
+}
+```
+
 ---
 
 ## 3) Órdenes (compras móvil)
