@@ -53,6 +53,7 @@ export default function AccountPage() {
   const [savingProfile, setSavingProfile] = useState(false)
   const [savingAddress, setSavingAddress] = useState(false)
   const [savingPassword, setSavingPassword] = useState(false)
+  const [deactivating, setDeactivating] = useState(false)
   const [accountError, setAccountError] = useState("")
   const [passwordError, setPasswordError] = useState("")
   const [passwordData, setPasswordData] = useState({
@@ -211,6 +212,32 @@ export default function AccountPage() {
       setPasswordError("No se pudo cambiar la contraseña")
     } finally {
       setSavingPassword(false)
+    }
+  }
+
+  const handleDeactivateAccount = async () => {
+    if (!confirm("¿Seguro que deseas desactivar tu cuenta?")) {
+      return
+    }
+
+    try {
+      setDeactivating(true)
+      const response = await fetch("/api/v1/account/deactivate", {
+        method: "POST",
+      })
+      const payload = await response.json()
+
+      if (!response.ok || !payload?.success) {
+        setPasswordError(payload?.error || "No se pudo desactivar la cuenta")
+        return
+      }
+
+      await logout()
+      router.push("/login")
+    } catch {
+      setPasswordError("No se pudo desactivar la cuenta")
+    } finally {
+      setDeactivating(false)
     }
   }
 
@@ -649,6 +676,17 @@ export default function AccountPage() {
                   <Save className="h-4 w-4" />
                   {savingPassword ? "Guardando..." : "Actualizar contraseña"}
                 </button>
+
+                {user.role !== "superadmin" && (
+                  <button
+                    type="button"
+                    onClick={handleDeactivateAccount}
+                    disabled={deactivating}
+                    className="mt-3 flex items-center gap-2 border border-destructive px-6 py-3 text-sm font-bold uppercase tracking-widest text-destructive"
+                  >
+                    {deactivating ? "Desactivando..." : "Desactivar cuenta"}
+                  </button>
+                )}
               </div>
             )}
           </div>

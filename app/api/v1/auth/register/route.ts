@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { registerSchema } from "@/lib/validations/auth.schema"
-import { findUserByEmail, createUser } from "@/lib/services/auth.service"
+import { registerOrReuseUser } from "@/lib/services/auth.service"
 import type { ApiResponse, UserPublic } from "@/lib/types"
 import { AUTH_COOKIE_NAME, serializeSession } from "@/lib/auth/session"
 import { signAuthToken } from "@/lib/auth/jwt"
@@ -17,20 +17,28 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const existing = await findUserByEmail(parsed.data.email)
+    const registration = await registerOrReuseUser({
+      ...parsed.data,
+      role: "buyer",
+      shopName: undefined,
+      isActive: true,
+    })
 
-    if (existing) {
+    if (registration.status === "active_exists") {
       return NextResponse.json<ApiResponse>(
         { success: false, error: "El email ya está registrado" },
         { status: 409 }
       )
     }
 
-    const user = await createUser({
-      ...parsed.data,
-      role: "buyer",
-      shopName: undefined,
-    })
+    const user = registration.user
+
+    if (!user) {
+      return NextResponse.json<ApiResponse>(
+        { success: false, error: "No se pudo registrar el usuario" },
+        { status: 500 }
+      )
+    }
 
     const userPublic: UserPublic = {
       id: user._id.toString(),

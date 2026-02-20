@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Loader2, LogOut, Save, Trash2, Upload, UserPlus } from "lucide-react"
+import { Eye, Loader2, LogOut, Save, Trash2, Upload, UserPlus, X } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 
 type Role = "superadmin" | "seller" | "buyer"
@@ -46,6 +46,17 @@ interface ApiResponse<T = unknown> {
   success: boolean
   data?: T
   error?: string
+}
+
+interface DashboardMetrics {
+  scope: "superadmin" | "seller"
+  totalUsuarios?: number
+  totalProductos: number
+  totalVentas: number
+  montoVendido: number
+  comision: number
+  neto?: number
+  tasaComision: number
 }
 
 interface ProductForm {
@@ -92,7 +103,9 @@ export default function AdminPage() {
   const [products, setProducts] = useState<SellerProduct[]>([])
   const [productForm, setProductForm] = useState<ProductForm>(emptyProduct)
   const [editingProductId, setEditingProductId] = useState<string | null>(null)
+  const [selectedProduct, setSelectedProduct] = useState<SellerProduct | null>(null)
   const [uploadingIndex, setUploadingIndex] = useState<number | null>(null)
+  const [metrics, setMetrics] = useState<DashboardMetrics | null>(null)
 
   const title = useMemo(() => {
     if (me?.role === "superadmin") return "Panel de administración"
@@ -132,12 +145,22 @@ export default function AdminPage() {
 
     if (me.role === "superadmin") {
       refreshUsers()
+      refreshMetrics()
     }
 
     if (me.role === "seller") {
       refreshMyProducts()
+      refreshMetrics()
     }
   }, [me])
+
+  const refreshMetrics = async () => {
+    const response = await fetch("/api/v1/admin/metrics")
+    const payload = (await response.json()) as ApiResponse<DashboardMetrics>
+    if (response.ok && payload.success && payload.data) {
+      setMetrics(payload.data)
+    }
+  }
 
   const refreshUsers = async () => {
     const response = await fetch("/api/v1/admin/users")
@@ -311,6 +334,12 @@ export default function AdminPage() {
           </div>
           <div className="flex gap-2">
             <Link
+              href="/cuenta"
+              className="border border-border px-4 py-2 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground"
+            >
+              Mi perfil
+            </Link>
+            <Link
               href="/"
               className="border border-border px-4 py-2 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground"
             >
@@ -334,6 +363,28 @@ export default function AdminPage() {
         )}
 
         {me.role === "superadmin" && (
+          <>
+            {metrics && (
+              <div className="mb-6 grid gap-4 md:grid-cols-4">
+                <div className="border border-border bg-card p-4">
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Usuarios activos</p>
+                  <p className="mt-1 font-display text-2xl font-bold text-foreground">{metrics.totalUsuarios || 0}</p>
+                </div>
+                <div className="border border-border bg-card p-4">
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Productos</p>
+                  <p className="mt-1 font-display text-2xl font-bold text-foreground">{metrics.totalProductos}</p>
+                </div>
+                <div className="border border-border bg-card p-4">
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Ventas</p>
+                  <p className="mt-1 font-display text-2xl font-bold text-foreground">{metrics.totalVentas}</p>
+                </div>
+                <div className="border border-border bg-card p-4">
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Comisión plataforma</p>
+                  <p className="mt-1 font-display text-2xl font-bold text-foreground">${metrics.comision.toFixed(2)} MXN</p>
+                </div>
+              </div>
+            )}
+
           <div className="grid gap-6 lg:grid-cols-3">
             <form
               onSubmit={handleCreateSeller}
@@ -448,9 +499,32 @@ export default function AdminPage() {
               </div>
             </div>
           </div>
+          </>
         )}
 
         {me.role === "seller" && (
+          <>
+            {metrics && (
+              <div className="mb-6 grid gap-4 md:grid-cols-4">
+                <div className="border border-border bg-card p-4">
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Mis productos</p>
+                  <p className="mt-1 font-display text-2xl font-bold text-foreground">{metrics.totalProductos}</p>
+                </div>
+                <div className="border border-border bg-card p-4">
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Mis ventas</p>
+                  <p className="mt-1 font-display text-2xl font-bold text-foreground">{metrics.totalVentas}</p>
+                </div>
+                <div className="border border-border bg-card p-4">
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Monto vendido</p>
+                  <p className="mt-1 font-display text-2xl font-bold text-foreground">${metrics.montoVendido.toFixed(2)} MXN</p>
+                </div>
+                <div className="border border-border bg-card p-4">
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Comisión / neto</p>
+                  <p className="mt-1 text-sm font-bold text-foreground">${metrics.comision.toFixed(2)} / ${Number(metrics.neto || 0).toFixed(2)}</p>
+                </div>
+              </div>
+            )}
+
           <div className="grid gap-6 lg:grid-cols-3">
             <form
               onSubmit={handleSaveProduct}
@@ -607,6 +681,16 @@ export default function AdminPage() {
                     <div className="flex gap-2">
                       <button
                         type="button"
+                        onClick={() => setSelectedProduct(product)}
+                        className="border border-border px-3 py-1 text-xs font-bold uppercase"
+                      >
+                        <span className="inline-flex items-center gap-1">
+                          <Eye className="h-3 w-3" />
+                          Ver
+                        </span>
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => {
                           setEditingProductId(product.id)
                           setProductForm({
@@ -648,6 +732,58 @@ export default function AdminPage() {
                   <Upload className="h-3 w-3" />
                   Ver mis productos en la tienda
                 </Link>
+              </div>
+            </div>
+          </div>
+          </>
+        )}
+
+        {selectedProduct && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 px-4">
+            <div className="w-full max-w-2xl border border-border bg-card p-6">
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="font-display text-xl font-bold uppercase text-foreground">
+                  Detalle de gorra
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setSelectedProduct(null)}
+                  className="text-muted-foreground hover:text-foreground"
+                  aria-label="Cerrar"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">Nombre: {selectedProduct.name}</p>
+                  <p className="text-sm text-muted-foreground">Marca: {selectedProduct.brand}</p>
+                  <p className="text-sm text-muted-foreground">Categoría: {selectedProduct.category}</p>
+                  <p className="text-sm text-muted-foreground">Precio: ${selectedProduct.price} MXN</p>
+                  <p className="text-sm text-muted-foreground">Stock: {selectedProduct.stock}</p>
+                  <p className="text-sm text-muted-foreground">Descripción: {selectedProduct.description || "Sin descripción"}</p>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Imágenes
+                  </p>
+                  {selectedProduct.imageUrls.length === 0 && (
+                    <p className="text-xs text-muted-foreground">Sin imágenes</p>
+                  )}
+                  {selectedProduct.imageUrls.map((url, index) => (
+                    <a
+                      key={`${url}-${index}`}
+                      href={url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="block truncate border border-border px-3 py-2 text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      Imagen {index + 1}
+                    </a>
+                  ))}
+                </div>
               </div>
             </div>
           </div>

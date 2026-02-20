@@ -30,6 +30,7 @@ export async function createUser(data: {
   password: string
   role?: "buyer" | "seller" | "superadmin"
   shopName?: string
+  isActive?: boolean
 }) {
   await connectDB()
   const hashedPassword = await bcrypt.hash(data.password, 10)
@@ -40,6 +41,49 @@ export async function createUser(data: {
     password: hashedPassword,
   })
   return user.save()
+}
+
+export async function registerOrReuseUser(data: {
+  name: string
+  email: string
+  password: string
+  role?: "buyer" | "seller" | "superadmin"
+  shopName?: string
+  isActive?: boolean
+}) {
+  await connectDB()
+  const normalizedEmail = data.email.toLowerCase().trim()
+  const existing = await User.findOne({ email: normalizedEmail })
+
+  const hashedPassword = await bcrypt.hash(data.password, 10)
+
+  if (existing) {
+    if (existing.isActive) {
+      return { status: "active_exists" as const }
+    }
+
+    existing.name = data.name
+    existing.email = normalizedEmail
+    existing.password = hashedPassword
+    existing.role = data.role || "buyer"
+    existing.shopName = data.shopName
+    existing.telefono = undefined
+    existing.direccion = undefined
+    existing.ciudad = undefined
+    existing.estado = undefined
+    existing.codigoPostal = undefined
+    existing.isActive = data.isActive ?? true
+
+    const user = await existing.save()
+    return { status: "reused" as const, user }
+  }
+
+  const user = await createUser({
+    ...data,
+    email: normalizedEmail,
+  })
+
+  return { status: "created" as const, user }
 }
 
 export async function validateUserCredentials(email: string, password: string) {
@@ -116,6 +160,22 @@ export async function updateUserProfile(
       $set: {
         name: data.name,
         telefono: data.telefono,
+      },
+    },
+    { new: true }
+  )
+    .select("-password")
+    .lean()
+}
+
+export async function deactivateUserAccount(userId: string) {
+  await connectDB()
+
+  return User.findByIdAndUpdate(
+    userId,
+    {
+      $set: {
+        isActive: false,
       },
     },
     { new: true }

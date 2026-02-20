@@ -1,27 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createSellerSchema } from "@/lib/validations/auth.schema"
 import { registerOrReuseUser } from "@/lib/services/auth.service"
-import { getRequestAuth } from "@/lib/auth/request-auth"
 import type { ApiResponse } from "@/lib/types"
 
 export async function POST(req: NextRequest) {
   try {
-    const auth = getRequestAuth(req)
-
-    if (!auth) {
-      return NextResponse.json<ApiResponse>(
-        { success: false, error: "Se requiere autenticación" },
-        { status: 401 }
-      )
-    }
-
-    if (auth.role !== "superadmin") {
-      return NextResponse.json<ApiResponse>(
-        { success: false, error: "Solo superadmin puede registrar vendedores" },
-        { status: 403 }
-      )
-    }
-
     const body = await req.json()
     const parsed = createSellerSchema.safeParse(body)
 
@@ -35,7 +18,7 @@ export async function POST(req: NextRequest) {
     const registration = await registerOrReuseUser({
       ...parsed.data,
       role: "seller",
-      isActive: true,
+      isActive: false,
     })
 
     if (registration.status === "active_exists") {
@@ -45,9 +28,9 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const seller = registration.user
+    const user = registration.user
 
-    if (!seller) {
+    if (!user) {
       return NextResponse.json<ApiResponse>(
         { success: false, error: "No se pudo registrar el vendedor" },
         { status: 500 }
@@ -58,17 +41,19 @@ export async function POST(req: NextRequest) {
       {
         success: true,
         data: {
-          id: seller._id.toString(),
-          name: seller.name,
-          email: seller.email,
-          role: seller.role,
-          shopName: seller.shopName,
+          id: user._id.toString(),
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          shopName: user.shopName,
+          isActive: user.isActive,
+          message: "Registro enviado. Un administrador debe activar tu cuenta.",
         },
       },
       { status: 201 }
     )
   } catch (error) {
-    console.error("[POST /api/v1/admin/sellers]", error)
+    console.error("[POST /api/v1/auth/register-seller]", error)
     return NextResponse.json<ApiResponse>(
       { success: false, error: "Error interno del servidor" },
       { status: 500 }

@@ -5,12 +5,13 @@ import React from "react"
 import { useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Eye, EyeOff, LogIn, ArrowRight } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 
 export default function LoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { login } = useAuth()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -35,7 +36,8 @@ export default function LoginPage() {
         sessionStorage.setItem("urban-hat-admin", "true")
         router.push("/admin")
       } else {
-        router.push("/cuenta")
+        const nextPath = searchParams.get("next")
+        router.push(nextPath || "/cuenta")
       }
     } else {
       setError(result.error || "Error al iniciar sesion")

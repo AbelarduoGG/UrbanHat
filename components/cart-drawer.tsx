@@ -143,7 +143,7 @@ export function CartDrawer() {
               </span>
             </div>
             <Link
-              href="/checkout"
+              href={user ? "/checkout" : "/login?next=/checkout"}
               onClick={() => setIsCartOpen(false)}
               className="block w-full bg-accent py-4 text-center text-sm font-bold uppercase tracking-widest text-accent-foreground transition-opacity hover:opacity-90"
             >
