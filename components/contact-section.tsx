@@ -77,7 +77,11 @@ export function ContactSection() {
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+          <form
+            onSubmit={handleSubmit}
+            className="flex flex-col gap-5"
+            suppressHydrationWarning
+          >
             <div className="grid gap-5 sm:grid-cols-2">
               <div>
                 <label
@@ -91,6 +95,7 @@ export function ContactSection() {
                   type="text"
                   required
                   placeholder="Tu nombre"
+                  suppressHydrationWarning
                   className="w-full border border-border bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-foreground focus:outline-none"
                 />
               </div>
@@ -106,6 +111,7 @@ export function ContactSection() {
                   type="email"
                   required
                   placeholder="tu@email.com"
+                  suppressHydrationWarning
                   className="w-full border border-border bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-foreground focus:outline-none"
                 />
               </div>
@@ -122,6 +128,7 @@ export function ContactSection() {
                 type="text"
                 required
                 placeholder="De que quieres hablar?"
+                suppressHydrationWarning
                 className="w-full border border-border bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-foreground focus:outline-none"
               />
             </div>
@@ -137,6 +144,7 @@ export function ContactSection() {
                 required
                 rows={5}
                 placeholder="Escribe tu mensaje..."
+                suppressHydrationWarning
                 className="w-full resize-none border border-border bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-foreground focus:outline-none"
               />
             </div>
