@@ -11,6 +11,7 @@ export interface IProduct extends Document {
   imageUrls: string[]
   category: string
   isActive: boolean
+  status: "active" | "paused" | "archived"
 }
 
 const ProductSchema = new Schema<IProduct>({
@@ -35,6 +36,11 @@ const ProductSchema = new Schema<IProduct>({
   },
   category: { type: String, default: "General" },
   isActive: { type: Boolean, default: true },
+  status: {
+    type: String,
+    enum: ["active", "paused", "archived"],
+    default: "active",
+  },
 })
 
 ProductSchema.pre("validate", function ensurePrimaryImage(next) {

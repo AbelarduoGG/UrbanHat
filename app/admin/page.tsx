@@ -2,11 +2,34 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { useRouter } from "next/navigation"
-import { Eye, Loader2, LogOut, Save, Trash2, Upload, UserPlus, X } from "lucide-react"
+import {
+  Archive,
+  BarChart3,
+  Eye,
+  Loader2,
+  LogOut,
+  Pause,
+  Play,
+  Save,
+  Upload,
+  X,
+} from "lucide-react"
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Legend,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts"
 import { useAuth } from "@/lib/auth-context"
 
 type Role = "superadmin" | "seller" | "buyer"
+type ProductStatus = "active" | "paused" | "archived"
 
 interface MeUser {
   id: string
@@ -25,7 +48,6 @@ interface AdminUser {
   role: Role
   shopName?: string
   isActive: boolean
-  createdAt?: string
 }
 
 interface SellerProduct {
@@ -40,6 +62,7 @@ interface SellerProduct {
   category: string
   sellerName: string
   isActive: boolean
+  status: ProductStatus
 }
 
 interface ApiResponse<T = unknown> {
@@ -85,6 +108,12 @@ function roleLabel(role: Role) {
   return "Cliente"
 }
 
+function statusLabel(status: ProductStatus) {
+  if (status === "active") return "Activo"
+  if (status === "paused") return "Pausado"
+  return "Archivado"
+}
+
 export default function AdminPage() {
   const router = useRouter()
   const { logout } = useAuth()
@@ -93,13 +122,6 @@ export default function AdminPage() {
   const [message, setMessage] = useState("")
 
   const [users, setUsers] = useState<AdminUser[]>([])
-  const [sellerForm, setSellerForm] = useState({
-    name: "",
-    email: "",
-    password: "",
-    shopName: "",
-  })
-
   const [products, setProducts] = useState<SellerProduct[]>([])
   const [productForm, setProductForm] = useState<ProductForm>(emptyProduct)
   const [editingProductId, setEditingProductId] = useState<string | null>(null)
@@ -143,14 +165,15 @@ export default function AdminPage() {
   useEffect(() => {
     if (!me) return
 
+    refreshMetrics()
+
     if (me.role === "superadmin") {
       refreshUsers()
-      refreshMetrics()
+      return
     }
 
     if (me.role === "seller") {
       refreshMyProducts()
-      refreshMetrics()
     }
   }, [me])
 
@@ -181,28 +204,6 @@ export default function AdminPage() {
   const handleLogout = async () => {
     await logout()
     router.push("/")
-  }
-
-  const handleCreateSeller = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setMessage("")
-
-    const response = await fetch("/api/v1/admin/sellers", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(sellerForm),
-    })
-
-    const payload = (await response.json()) as ApiResponse
-
-    if (!response.ok || !payload.success) {
-      setMessage(payload.error || "No se pudo crear el vendedor")
-      return
-    }
-
-    setSellerForm({ name: "", email: "", password: "", shopName: "" })
-    setMessage("Vendedor creado correctamente")
-    await refreshUsers()
   }
 
   const handleUserPatch = async (
@@ -297,21 +298,26 @@ export default function AdminPage() {
     setEditingProductId(null)
     setMessage(editingProductId ? "Gorra actualizada" : "Gorra creada")
     await refreshMyProducts()
+    await refreshMetrics()
   }
 
-  const handleDeleteProduct = async (productId: string) => {
+  const updateProductStatus = async (productId: string, status: ProductStatus) => {
     setMessage("")
+
     const response = await fetch(`/api/v1/products/${productId}`, {
-      method: "DELETE",
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
     })
 
     const payload = (await response.json()) as ApiResponse
     if (!response.ok || !payload.success) {
-      setMessage(payload.error || "No se pudo eliminar la gorra")
+      setMessage(payload.error || "No se pudo actualizar estado")
       return
     }
 
     await refreshMyProducts()
+    await refreshMetrics()
   }
 
   if (isLoading || !me) {
@@ -321,6 +327,24 @@ export default function AdminPage() {
       </div>
     )
   }
+
+  const adminChartData = metrics
+    ? [
+        { name: "Usuarios", valor: metrics.totalUsuarios || 0 },
+        { name: "Productos", valor: metrics.totalProductos },
+        { name: "Ventas", valor: metrics.totalVentas },
+        { name: "Comisión", valor: Number(metrics.comision.toFixed(2)) },
+      ]
+    : []
+
+  const sellerChartData = metrics
+    ? [
+        { name: "Productos", valor: metrics.totalProductos },
+        { name: "Ventas", valor: metrics.totalVentas },
+        { name: "Comisión", valor: Number(metrics.comision.toFixed(2)) },
+        { name: "Neto", valor: Number((metrics.neto || 0).toFixed(2)) },
+      ]
+    : []
 
   return (
     <div className="min-h-screen bg-background px-4 py-8 lg:px-8">
@@ -365,87 +389,54 @@ export default function AdminPage() {
         {me.role === "superadmin" && (
           <>
             {metrics && (
-              <div className="mb-6 grid gap-4 md:grid-cols-4">
-                <div className="border border-border bg-card p-4">
-                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Usuarios activos</p>
-                  <p className="mt-1 font-display text-2xl font-bold text-foreground">{metrics.totalUsuarios || 0}</p>
+              <>
+                <div className="mb-6 grid gap-4 md:grid-cols-4">
+                  <div className="border border-border bg-card p-4">
+                    <p className="text-xs uppercase tracking-wider text-muted-foreground">Usuarios activos</p>
+                    <p className="mt-1 font-display text-2xl font-bold text-foreground">{metrics.totalUsuarios || 0}</p>
+                  </div>
+                  <div className="border border-border bg-card p-4">
+                    <p className="text-xs uppercase tracking-wider text-muted-foreground">Productos</p>
+                    <p className="mt-1 font-display text-2xl font-bold text-foreground">{metrics.totalProductos}</p>
+                  </div>
+                  <div className="border border-border bg-card p-4">
+                    <p className="text-xs uppercase tracking-wider text-muted-foreground">Ventas</p>
+                    <p className="mt-1 font-display text-2xl font-bold text-foreground">{metrics.totalVentas}</p>
+                  </div>
+                  <div className="border border-border bg-card p-4">
+                    <p className="text-xs uppercase tracking-wider text-muted-foreground">Comisión plataforma</p>
+                    <p className="mt-1 font-display text-2xl font-bold text-foreground">${metrics.comision.toFixed(2)} MXN</p>
+                  </div>
                 </div>
-                <div className="border border-border bg-card p-4">
-                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Productos</p>
-                  <p className="mt-1 font-display text-2xl font-bold text-foreground">{metrics.totalProductos}</p>
+
+                <div className="mb-6 border border-border bg-card p-4">
+                  <div className="mb-3 flex items-center gap-2 text-foreground">
+                    <BarChart3 className="h-4 w-4" />
+                    <p className="text-xs font-bold uppercase tracking-wider">Gráfica general</p>
+                  </div>
+                  <div className="h-72 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={adminChartData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                        <XAxis dataKey="name" />
+                        <YAxis />
+                        <Tooltip />
+                        <Legend />
+                        <Bar dataKey="valor" fill="#f97316" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
                 </div>
-                <div className="border border-border bg-card p-4">
-                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Ventas</p>
-                  <p className="mt-1 font-display text-2xl font-bold text-foreground">{metrics.totalVentas}</p>
-                </div>
-                <div className="border border-border bg-card p-4">
-                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Comisión plataforma</p>
-                  <p className="mt-1 font-display text-2xl font-bold text-foreground">${metrics.comision.toFixed(2)} MXN</p>
-                </div>
-              </div>
+              </>
             )}
 
-          <div className="grid gap-6 lg:grid-cols-3">
-            <form
-              onSubmit={handleCreateSeller}
-              className="border border-border bg-card p-4 lg:col-span-1"
-            >
-              <h2 className="mb-4 font-display text-lg font-bold uppercase text-foreground">
-                Crear vendedor
-              </h2>
-              <div className="space-y-3">
-                <input
-                  value={sellerForm.name}
-                  onChange={(e) =>
-                    setSellerForm((prev) => ({ ...prev, name: e.target.value }))
-                  }
-                  className="w-full border border-border bg-background px-3 py-2 text-sm"
-                  placeholder="Nombre"
-                  required
-                />
-                <input
-                  value={sellerForm.email}
-                  onChange={(e) =>
-                    setSellerForm((prev) => ({ ...prev, email: e.target.value }))
-                  }
-                  className="w-full border border-border bg-background px-3 py-2 text-sm"
-                  placeholder="Correo"
-                  type="email"
-                  required
-                />
-                <input
-                  value={sellerForm.password}
-                  onChange={(e) =>
-                    setSellerForm((prev) => ({ ...prev, password: e.target.value }))
-                  }
-                  className="w-full border border-border bg-background px-3 py-2 text-sm"
-                  placeholder="Contraseña"
-                  type="password"
-                  required
-                />
-                <input
-                  value={sellerForm.shopName}
-                  onChange={(e) =>
-                    setSellerForm((prev) => ({ ...prev, shopName: e.target.value }))
-                  }
-                  className="w-full border border-border bg-background px-3 py-2 text-sm"
-                  placeholder="Nombre de tienda"
-                  required
-                />
-              </div>
-              <button
-                type="submit"
-                className="mt-4 flex w-full items-center justify-center gap-2 bg-accent py-2 text-xs font-bold uppercase tracking-wider text-accent-foreground"
-              >
-                <UserPlus className="h-4 w-4" />
-                Crear vendedor
-              </button>
-            </form>
-
-            <div className="border border-border bg-card p-4 lg:col-span-2">
+            <div className="border border-border bg-card p-4">
               <h2 className="mb-4 font-display text-lg font-bold uppercase text-foreground">
                 Usuarios del sistema
               </h2>
+              <p className="mb-4 text-xs text-muted-foreground">
+                El registro de vendedores es público desde "Registro Vendedor"; aquí solo gestionas activación y roles.
+              </p>
               <div className="space-y-3">
                 {users.map((user) => {
                   const uid = user.id || user._id || ""
@@ -486,9 +477,7 @@ export default function AdminPage() {
                               }
                               className="border border-border px-3 py-1 text-xs font-bold uppercase"
                             >
-                              {user.role === "seller"
-                                ? "Pasar a cliente"
-                                : "Pasar a vendedor"}
+                              {user.role === "seller" ? "Pasar a cliente" : "Pasar a vendedor"}
                             </button>
                           </>
                         )}
@@ -498,249 +487,308 @@ export default function AdminPage() {
                 })}
               </div>
             </div>
-          </div>
           </>
         )}
 
         {me.role === "seller" && (
           <>
             {metrics && (
-              <div className="mb-6 grid gap-4 md:grid-cols-4">
-                <div className="border border-border bg-card p-4">
-                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Mis productos</p>
-                  <p className="mt-1 font-display text-2xl font-bold text-foreground">{metrics.totalProductos}</p>
+              <>
+                <div className="mb-6 grid gap-4 md:grid-cols-4">
+                  <div className="border border-border bg-card p-4">
+                    <p className="text-xs uppercase tracking-wider text-muted-foreground">Mis productos</p>
+                    <p className="mt-1 font-display text-2xl font-bold text-foreground">{metrics.totalProductos}</p>
+                  </div>
+                  <div className="border border-border bg-card p-4">
+                    <p className="text-xs uppercase tracking-wider text-muted-foreground">Mis ventas</p>
+                    <p className="mt-1 font-display text-2xl font-bold text-foreground">{metrics.totalVentas}</p>
+                  </div>
+                  <div className="border border-border bg-card p-4">
+                    <p className="text-xs uppercase tracking-wider text-muted-foreground">Monto vendido</p>
+                    <p className="mt-1 font-display text-2xl font-bold text-foreground">${metrics.montoVendido.toFixed(2)} MXN</p>
+                  </div>
+                  <div className="border border-border bg-card p-4">
+                    <p className="text-xs uppercase tracking-wider text-muted-foreground">Comisión / neto</p>
+                    <p className="mt-1 text-sm font-bold text-foreground">${metrics.comision.toFixed(2)} / ${Number(metrics.neto || 0).toFixed(2)}</p>
+                  </div>
                 </div>
-                <div className="border border-border bg-card p-4">
-                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Mis ventas</p>
-                  <p className="mt-1 font-display text-2xl font-bold text-foreground">{metrics.totalVentas}</p>
+
+                <div className="mb-6 border border-border bg-card p-4">
+                  <div className="mb-3 flex items-center gap-2 text-foreground">
+                    <BarChart3 className="h-4 w-4" />
+                    <p className="text-xs font-bold uppercase tracking-wider">Gráfica de desempeño</p>
+                  </div>
+                  <div className="h-72 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={sellerChartData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                        <XAxis dataKey="name" />
+                        <YAxis />
+                        <Tooltip />
+                        <Legend />
+                        <Bar dataKey="valor" fill="#f97316" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
                 </div>
-                <div className="border border-border bg-card p-4">
-                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Monto vendido</p>
-                  <p className="mt-1 font-display text-2xl font-bold text-foreground">${metrics.montoVendido.toFixed(2)} MXN</p>
-                </div>
-                <div className="border border-border bg-card p-4">
-                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Comisión / neto</p>
-                  <p className="mt-1 text-sm font-bold text-foreground">${metrics.comision.toFixed(2)} / ${Number(metrics.neto || 0).toFixed(2)}</p>
-                </div>
-              </div>
+              </>
             )}
 
-          <div className="grid gap-6 lg:grid-cols-3">
-            <form
-              onSubmit={handleSaveProduct}
-              className="border border-border bg-card p-4 lg:col-span-1"
-            >
-              <h2 className="mb-4 font-display text-lg font-bold uppercase text-foreground">
-                {editingProductId ? "Editar gorra" : "Nueva gorra"}
-              </h2>
+            <div className="grid gap-6 lg:grid-cols-3">
+              <form
+                onSubmit={handleSaveProduct}
+                className="border border-border bg-card p-4 lg:col-span-1"
+              >
+                <h2 className="mb-4 font-display text-lg font-bold uppercase text-foreground">
+                  {editingProductId ? "Editar gorra" : "Nueva gorra"}
+                </h2>
 
-              <div className="space-y-3">
-                <input
-                  value={productForm.name}
-                  onChange={(e) =>
-                    setProductForm((prev) => ({ ...prev, name: e.target.value }))
-                  }
-                  className="w-full border border-border bg-background px-3 py-2 text-sm"
-                  placeholder="Nombre"
-                  required
-                />
+                <div className="space-y-3">
+                  <input
+                    value={productForm.name}
+                    onChange={(e) =>
+                      setProductForm((prev) => ({ ...prev, name: e.target.value }))
+                    }
+                    className="w-full border border-border bg-background px-3 py-2 text-sm"
+                    placeholder="Nombre"
+                    required
+                  />
 
-                <input
-                  value={productForm.brand}
-                  onChange={(e) =>
-                    setProductForm((prev) => ({ ...prev, brand: e.target.value }))
-                  }
-                  className="w-full border border-border bg-background px-3 py-2 text-sm"
-                  placeholder="Marca"
-                  required
-                />
+                  <input
+                    value={productForm.brand}
+                    onChange={(e) =>
+                      setProductForm((prev) => ({ ...prev, brand: e.target.value }))
+                    }
+                    className="w-full border border-border bg-background px-3 py-2 text-sm"
+                    placeholder="Marca"
+                    required
+                  />
 
-                <textarea
-                  value={productForm.description}
-                  onChange={(e) =>
-                    setProductForm((prev) => ({ ...prev, description: e.target.value }))
-                  }
-                  className="w-full border border-border bg-background px-3 py-2 text-sm"
-                  placeholder="Descripción"
-                  rows={3}
-                />
+                  <textarea
+                    value={productForm.description}
+                    onChange={(e) =>
+                      setProductForm((prev) => ({ ...prev, description: e.target.value }))
+                    }
+                    className="w-full border border-border bg-background px-3 py-2 text-sm"
+                    placeholder="Descripción"
+                    rows={3}
+                  />
 
-                <input
-                  type="number"
-                  value={productForm.price}
-                  onChange={(e) =>
-                    setProductForm((prev) => ({ ...prev, price: Number(e.target.value) }))
-                  }
-                  className="w-full border border-border bg-background px-3 py-2 text-sm"
-                  placeholder="Precio"
-                  min={0}
-                  required
-                />
+                  <input
+                    type="number"
+                    value={productForm.price}
+                    onChange={(e) =>
+                      setProductForm((prev) => ({ ...prev, price: Number(e.target.value) }))
+                    }
+                    className="w-full border border-border bg-background px-3 py-2 text-sm"
+                    placeholder="Precio"
+                    min={0}
+                    required
+                  />
 
-                <input
-                  type="number"
-                  value={productForm.stock}
-                  onChange={(e) =>
-                    setProductForm((prev) => ({ ...prev, stock: Number(e.target.value) }))
-                  }
-                  className="w-full border border-border bg-background px-3 py-2 text-sm"
-                  placeholder="Inventario"
-                  min={0}
-                  required
-                />
+                  <input
+                    type="number"
+                    value={productForm.stock}
+                    onChange={(e) =>
+                      setProductForm((prev) => ({ ...prev, stock: Number(e.target.value) }))
+                    }
+                    className="w-full border border-border bg-background px-3 py-2 text-sm"
+                    placeholder="Inventario"
+                    min={0}
+                    required
+                  />
 
-                <input
-                  value={productForm.category}
-                  onChange={(e) =>
-                    setProductForm((prev) => ({ ...prev, category: e.target.value }))
-                  }
-                  className="w-full border border-border bg-background px-3 py-2 text-sm"
-                  placeholder="Categoría"
-                  required
-                />
+                  <input
+                    value={productForm.category}
+                    onChange={(e) =>
+                      setProductForm((prev) => ({ ...prev, category: e.target.value }))
+                    }
+                    className="w-full border border-border bg-background px-3 py-2 text-sm"
+                    placeholder="Categoría"
+                    required
+                  />
 
-                <div className="space-y-2">
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                    Imágenes del producto (máximo 3)
+                  <div className="space-y-2">
+                    <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                      Imágenes del producto (máximo 3)
+                    </p>
+
+                    {[0, 1, 2].map((index) => (
+                      <div key={index} className="border border-border p-2">
+                        <label className="mb-2 block text-xs text-muted-foreground">
+                          Imagen {index + 1}
+                        </label>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="mb-2 block w-full text-xs text-muted-foreground"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            if (file) {
+                              uploadImage(file, index)
+                            }
+                          }}
+                        />
+
+                        {uploadingIndex === index && (
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                            Subiendo imagen...
+                          </div>
+                        )}
+
+                        {productForm.imageUrls[index] && (
+                          <div className="space-y-2">
+                            <Image
+                              src={productForm.imageUrls[index]}
+                              alt={`Vista previa ${index + 1}`}
+                              width={320}
+                              height={180}
+                              className="h-28 w-full object-cover"
+                            />
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="truncate text-xs text-foreground">Imagen cargada</p>
+                              <button
+                                type="button"
+                                onClick={() => setImageAtIndex(index, "")}
+                                className="text-xs font-medium text-destructive"
+                              >
+                                Quitar
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  className="mt-4 flex w-full items-center justify-center gap-2 bg-accent py-2 text-xs font-bold uppercase tracking-wider text-accent-foreground"
+                >
+                  <Save className="h-4 w-4" />
+                  {editingProductId ? "Guardar cambios" : "Crear gorra"}
+                </button>
+              </form>
+
+              <div className="border border-border bg-card p-4 lg:col-span-2">
+                <h2 className="mb-4 font-display text-lg font-bold uppercase text-foreground">
+                  Mis gorras
+                </h2>
+
+                {products.length === 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    Aún no tienes productos. Crea tu primera gorra para publicarla en la tienda.
                   </p>
+                )}
 
-                  {[0, 1, 2].map((index) => (
-                    <div key={index} className="border border-border p-2">
-                      <label className="mb-2 block text-xs text-muted-foreground">
-                        Imagen {index + 1}
-                      </label>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="mb-2 block w-full text-xs text-muted-foreground"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0]
-                          if (file) {
-                            uploadImage(file, index)
-                          }
-                        }}
-                      />
+                <div className="space-y-3">
+                  {products.map((product) => (
+                    <div
+                      key={product.id}
+                      className="flex flex-col gap-2 border border-border p-3 md:flex-row md:items-center md:justify-between"
+                    >
+                      <div>
+                        <p className="text-sm font-bold text-foreground">{product.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {product.brand} • {product.category} • {statusLabel(product.status)} • Stock: {product.stock} • ${product.price} MXN
+                        </p>
+                      </div>
 
-                      {uploadingIndex === index && (
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                          Subiendo imagen...
-                        </div>
-                      )}
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedProduct(product)}
+                          className="border border-border px-3 py-1 text-xs font-bold uppercase"
+                        >
+                          <span className="inline-flex items-center gap-1">
+                            <Eye className="h-3 w-3" />
+                            Ver
+                          </span>
+                        </button>
 
-                      {productForm.imageUrls[index] && (
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="truncate text-xs text-foreground">Imagen cargada</p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingProductId(product.id)
+                            setProductForm({
+                              name: product.name,
+                              brand: product.brand,
+                              description: product.description,
+                              price: product.price,
+                              stock: product.stock,
+                              imageUrls: [
+                                product.imageUrls[0] || "",
+                                product.imageUrls[1] || "",
+                                product.imageUrls[2] || "",
+                              ],
+                              category: product.category,
+                            })
+                          }}
+                          className="border border-border px-3 py-1 text-xs font-bold uppercase"
+                        >
+                          Editar
+                        </button>
+
+                        {product.status !== "paused" && (
                           <button
                             type="button"
-                            onClick={() => setImageAtIndex(index, "")}
-                            className="text-xs font-medium text-destructive"
+                            onClick={() => updateProductStatus(product.id, "paused")}
+                            className="border border-border px-3 py-1 text-xs font-bold uppercase"
                           >
-                            Quitar
+                            <span className="inline-flex items-center gap-1">
+                              <Pause className="h-3 w-3" />
+                              Pausar
+                            </span>
                           </button>
-                        </div>
-                      )}
+                        )}
+
+                        {product.status !== "active" && (
+                          <button
+                            type="button"
+                            onClick={() => updateProductStatus(product.id, "active")}
+                            className="border border-border px-3 py-1 text-xs font-bold uppercase"
+                          >
+                            <span className="inline-flex items-center gap-1">
+                              <Play className="h-3 w-3" />
+                              Activar
+                            </span>
+                          </button>
+                        )}
+
+                        {product.status !== "archived" && (
+                          <button
+                            type="button"
+                            onClick={() => updateProductStatus(product.id, "archived")}
+                            className="flex items-center gap-1 bg-destructive px-3 py-1 text-xs font-bold uppercase text-destructive-foreground"
+                          >
+                            <Archive className="h-3 w-3" />
+                            Archivar
+                          </button>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
-              </div>
 
-              <button
-                type="submit"
-                className="mt-4 flex w-full items-center justify-center gap-2 bg-accent py-2 text-xs font-bold uppercase tracking-wider text-accent-foreground"
-              >
-                <Save className="h-4 w-4" />
-                {editingProductId ? "Guardar cambios" : "Crear gorra"}
-              </button>
-            </form>
-
-            <div className="border border-border bg-card p-4 lg:col-span-2">
-              <h2 className="mb-4 font-display text-lg font-bold uppercase text-foreground">
-                Mis gorras
-              </h2>
-
-              {products.length === 0 && (
-                <p className="text-sm text-muted-foreground">
-                  Aún no tienes productos. Crea tu primera gorra para publicarla en la tienda.
-                </p>
-              )}
-
-              <div className="space-y-3">
-                {products.map((product) => (
-                  <div
-                    key={product.id}
-                    className="flex flex-col gap-2 border border-border p-3 md:flex-row md:items-center md:justify-between"
+                <div className="mt-4 border-t border-border pt-4">
+                  <Link
+                    href="/"
+                    className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground"
                   >
-                    <div>
-                      <p className="text-sm font-bold text-foreground">{product.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {product.brand} • {product.category} • Stock: {product.stock} • ${product.price} MXN
-                      </p>
-                    </div>
-
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedProduct(product)}
-                        className="border border-border px-3 py-1 text-xs font-bold uppercase"
-                      >
-                        <span className="inline-flex items-center gap-1">
-                          <Eye className="h-3 w-3" />
-                          Ver
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditingProductId(product.id)
-                          setProductForm({
-                            name: product.name,
-                            brand: product.brand,
-                            description: product.description,
-                            price: product.price,
-                            stock: product.stock,
-                            imageUrls: [
-                              product.imageUrls[0] || "",
-                              product.imageUrls[1] || "",
-                              product.imageUrls[2] || "",
-                            ],
-                            category: product.category,
-                          })
-                        }}
-                        className="border border-border px-3 py-1 text-xs font-bold uppercase"
-                      >
-                        Editar
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteProduct(product.id)}
-                        className="flex items-center gap-1 bg-destructive px-3 py-1 text-xs font-bold uppercase text-destructive-foreground"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                        Eliminar
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-4 border-t border-border pt-4">
-                <Link
-                  href="/"
-                  className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground"
-                >
-                  <Upload className="h-3 w-3" />
-                  Ver mis productos en la tienda
-                </Link>
+                    <Upload className="h-3 w-3" />
+                    Ver mis productos en la tienda
+                  </Link>
+                </div>
               </div>
             </div>
-          </div>
           </>
         )}
 
         {selectedProduct && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 px-4">
-            <div className="w-full max-w-2xl border border-border bg-card p-6">
+            <div className="w-full max-w-3xl border border-border bg-card p-6">
               <div className="mb-4 flex items-center justify-between">
                 <h3 className="font-display text-xl font-bold uppercase text-foreground">
                   Detalle de gorra
@@ -760,28 +808,25 @@ export default function AdminPage() {
                   <p className="text-sm text-muted-foreground">Nombre: {selectedProduct.name}</p>
                   <p className="text-sm text-muted-foreground">Marca: {selectedProduct.brand}</p>
                   <p className="text-sm text-muted-foreground">Categoría: {selectedProduct.category}</p>
+                  <p className="text-sm text-muted-foreground">Estado: {statusLabel(selectedProduct.status)}</p>
                   <p className="text-sm text-muted-foreground">Precio: ${selectedProduct.price} MXN</p>
                   <p className="text-sm text-muted-foreground">Stock: {selectedProduct.stock}</p>
                   <p className="text-sm text-muted-foreground">Descripción: {selectedProduct.description || "Sin descripción"}</p>
                 </div>
 
-                <div className="space-y-2">
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                    Imágenes
-                  </p>
+                <div className="grid max-h-72 grid-cols-2 gap-2 overflow-auto">
                   {selectedProduct.imageUrls.length === 0 && (
                     <p className="text-xs text-muted-foreground">Sin imágenes</p>
                   )}
                   {selectedProduct.imageUrls.map((url, index) => (
-                    <a
+                    <Image
                       key={`${url}-${index}`}
-                      href={url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="block truncate border border-border px-3 py-2 text-xs text-muted-foreground hover:text-foreground"
-                    >
-                      Imagen {index + 1}
-                    </a>
+                      src={url}
+                      alt={`Imagen ${index + 1}`}
+                      width={220}
+                      height={140}
+                      className="h-28 w-full object-cover"
+                    />
                   ))}
                 </div>
               </div>

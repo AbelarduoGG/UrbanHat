@@ -3,7 +3,9 @@ import { Product, type IProduct } from "@/lib/db/models"
 
 export async function getAllProducts(onlyActive = true) {
   await connectDB()
-  const filter = onlyActive ? { isActive: true } : {}
+  const filter = onlyActive
+    ? { isActive: true, status: "active" }
+    : {}
   return Product.find(filter)
     .populate("sellerId", "name shopName")
     .sort({ _id: -1 })
@@ -41,10 +43,10 @@ export async function updateProduct(
 
 export async function deleteProduct(id: string, sellerId: string) {
   await connectDB()
-  // Soft delete
+  // Archivar producto
   return Product.findOneAndUpdate(
     { _id: id, sellerId },
-    { $set: { isActive: false } },
+    { $set: { status: "archived" } },
     { new: true }
   ).lean()
 }

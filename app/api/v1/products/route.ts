@@ -61,6 +61,7 @@ export async function GET(_req: NextRequest) {
       imageUrls: p.imageUrls?.length ? p.imageUrls : [p.imageUrl],
       category: p.category,
       isActive: p.isActive,
+      status: p.status || "active",
     }))
 
     return NextResponse.json<ApiResponse<ProductPublic[]>>(
@@ -113,6 +114,7 @@ export async function POST(req: NextRequest) {
       imageUrl: parsed.data.imageUrls[0],
       sellerId: auth.userId,
       isActive: true,
+      status: parsed.data.status || "active",
     })
 
     return NextResponse.json<ApiResponse>(
@@ -131,6 +133,7 @@ export async function POST(req: NextRequest) {
           imageUrls: product.imageUrls,
           category: product.category,
           isActive: product.isActive,
+          status: product.status,
         },
       },
       { status: 201 }

@@ -11,6 +11,7 @@ export const createProductSchema = z.object({
     .min(1, "Debes subir al menos 1 imagen")
     .max(3, "Máximo 3 imágenes por producto"),
   category: z.string().default("General"),
+  status: z.enum(["active", "paused", "archived"]).optional(),
 })
 
 export const updateProductSchema = createProductSchema.partial()

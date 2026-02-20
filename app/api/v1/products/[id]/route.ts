@@ -67,6 +67,7 @@ export async function PATCH(req: NextRequest, context: RouteParams) {
             : product?.imageUrl
               ? [product.imageUrl]
               : [],
+          status: product?.status || "active",
         },
       },
       { status: 200 }

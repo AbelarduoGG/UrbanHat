@@ -28,6 +28,7 @@ export interface ProductPublic {
   imageUrls: string[]
   category: string
   isActive: boolean
+  status: "active" | "paused" | "archived"
 }
 
 // --- Órdenes ---
