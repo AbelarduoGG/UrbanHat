@@ -11,6 +11,7 @@ import {
   Loader2,
   LogOut,
   Pause,
+  Plus,
   Play,
   Save,
   Upload,
@@ -125,6 +126,7 @@ export default function AdminPage() {
   const [products, setProducts] = useState<SellerProduct[]>([])
   const [productForm, setProductForm] = useState<ProductForm>(emptyProduct)
   const [editingProductId, setEditingProductId] = useState<string | null>(null)
+  const [isProductModalOpen, setIsProductModalOpen] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState<SellerProduct | null>(null)
   const [uploadingIndex, setUploadingIndex] = useState<number | null>(null)
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null)
@@ -263,6 +265,36 @@ export default function AdminPage() {
     }
   }
 
+  const closeProductModal = () => {
+    setIsProductModalOpen(false)
+    setEditingProductId(null)
+    setProductForm(emptyProduct)
+  }
+
+  const openCreateProductModal = () => {
+    setEditingProductId(null)
+    setProductForm(emptyProduct)
+    setIsProductModalOpen(true)
+  }
+
+  const openEditProductModal = (product: SellerProduct) => {
+    setEditingProductId(product.id)
+    setProductForm({
+      name: product.name,
+      brand: product.brand,
+      description: product.description,
+      price: product.price,
+      stock: product.stock,
+      imageUrls: [
+        product.imageUrls[0] || "",
+        product.imageUrls[1] || "",
+        product.imageUrls[2] || "",
+      ],
+      category: product.category,
+    })
+    setIsProductModalOpen(true)
+  }
+
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault()
     setMessage("")
@@ -294,9 +326,8 @@ export default function AdminPage() {
       return
     }
 
-    setProductForm(emptyProduct)
-    setEditingProductId(null)
     setMessage(editingProductId ? "Gorra actualizada" : "Gorra creada")
+    closeProductModal()
     await refreshMyProducts()
     await refreshMetrics()
   }
@@ -348,7 +379,7 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-background px-4 py-8 lg:px-8">
-      <div className="mx-auto max-w-6xl">
+      <div className="mx-auto max-w-7xl">
         <div className="mb-8 flex items-center justify-between border border-border bg-card p-4">
           <div>
             <h1 className="font-display text-2xl font-bold uppercase tracking-wider text-foreground">
@@ -534,46 +565,176 @@ export default function AdminPage() {
               </>
             )}
 
-            <div className="grid gap-6 lg:grid-cols-3">
-              <form
-                onSubmit={handleSaveProduct}
-                className="border border-border bg-card p-4 lg:col-span-1"
-              >
-                <h2 className="mb-4 font-display text-lg font-bold uppercase text-foreground">
-                  {editingProductId ? "Editar gorra" : "Nueva gorra"}
+            <div className="border border-border bg-card p-4">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <h2 className="font-display text-lg font-bold uppercase text-foreground">
+                  Mis gorras
                 </h2>
+                <button
+                  type="button"
+                  onClick={openCreateProductModal}
+                  className="inline-flex items-center gap-2 bg-accent px-4 py-2 text-xs font-bold uppercase tracking-wider text-accent-foreground"
+                >
+                  <Plus className="h-4 w-4" />
+                  Agregar producto
+                </button>
+              </div>
 
-                <div className="space-y-3">
-                  <input
-                    value={productForm.name}
-                    onChange={(e) =>
-                      setProductForm((prev) => ({ ...prev, name: e.target.value }))
-                    }
-                    className="w-full border border-border bg-background px-3 py-2 text-sm"
-                    placeholder="Nombre"
-                    required
-                  />
+              {products.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  Aún no tienes productos. Crea tu primera gorra para publicarla en la tienda.
+                </p>
+              )}
 
-                  <input
-                    value={productForm.brand}
-                    onChange={(e) =>
-                      setProductForm((prev) => ({ ...prev, brand: e.target.value }))
-                    }
-                    className="w-full border border-border bg-background px-3 py-2 text-sm"
-                    placeholder="Marca"
-                    required
-                  />
+              <div className="w-full overflow-x-auto">
+                <table className="w-full min-w-[980px] border-collapse">
+                  <thead>
+                    <tr className="border-b border-border text-left text-xs uppercase tracking-wider text-muted-foreground">
+                      <th className="px-3 py-2">Producto</th>
+                      <th className="px-3 py-2">Marca</th>
+                      <th className="px-3 py-2">Categoría</th>
+                      <th className="px-3 py-2">Estado</th>
+                      <th className="px-3 py-2">Stock</th>
+                      <th className="px-3 py-2">Precio</th>
+                      <th className="px-3 py-2 text-right">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {products.map((product) => (
+                      <tr key={product.id} className="border-b border-border/70 text-sm text-foreground">
+                        <td className="px-3 py-3 font-bold">{product.name}</td>
+                        <td className="px-3 py-3">{product.brand}</td>
+                        <td className="px-3 py-3">{product.category}</td>
+                        <td className="px-3 py-3">{statusLabel(product.status)}</td>
+                        <td className="px-3 py-3">{product.stock}</td>
+                        <td className="px-3 py-3">${product.price} MXN</td>
+                        <td className="px-3 py-3">
+                          <div className="flex flex-wrap justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedProduct(product)}
+                              className="border border-border px-3 py-1 text-xs font-bold uppercase"
+                            >
+                              <span className="inline-flex items-center gap-1">
+                                <Eye className="h-3 w-3" />
+                                Ver
+                              </span>
+                            </button>
 
-                  <textarea
-                    value={productForm.description}
-                    onChange={(e) =>
-                      setProductForm((prev) => ({ ...prev, description: e.target.value }))
-                    }
-                    className="w-full border border-border bg-background px-3 py-2 text-sm"
-                    placeholder="Descripción"
-                    rows={3}
-                  />
+                            <button
+                              type="button"
+                              onClick={() => openEditProductModal(product)}
+                              className="border border-border px-3 py-1 text-xs font-bold uppercase"
+                            >
+                              Editar
+                            </button>
 
+                            {product.status !== "paused" && (
+                              <button
+                                type="button"
+                                onClick={() => updateProductStatus(product.id, "paused")}
+                                className="border border-border px-3 py-1 text-xs font-bold uppercase"
+                              >
+                                <span className="inline-flex items-center gap-1">
+                                  <Pause className="h-3 w-3" />
+                                  Pausar
+                                </span>
+                              </button>
+                            )}
+
+                            {product.status !== "active" && (
+                              <button
+                                type="button"
+                                onClick={() => updateProductStatus(product.id, "active")}
+                                className="border border-border px-3 py-1 text-xs font-bold uppercase"
+                              >
+                                <span className="inline-flex items-center gap-1">
+                                  <Play className="h-3 w-3" />
+                                  Activar
+                                </span>
+                              </button>
+                            )}
+
+                            {product.status !== "archived" && (
+                              <button
+                                type="button"
+                                onClick={() => updateProductStatus(product.id, "archived")}
+                                className="flex items-center gap-1 bg-destructive px-3 py-1 text-xs font-bold uppercase text-destructive-foreground"
+                              >
+                                <Archive className="h-3 w-3" />
+                                Archivar
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="mt-4 border-t border-border pt-4">
+                <Link
+                  href="/"
+                  className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground"
+                >
+                  <Upload className="h-3 w-3" />
+                  Ver mis productos en la tienda
+                </Link>
+              </div>
+            </div>
+          </>
+        )}
+
+        {isProductModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 px-4">
+            <div className="w-full max-w-2xl border border-border bg-card p-6">
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="font-display text-xl font-bold uppercase text-foreground">
+                  {editingProductId ? "Editar gorra" : "Nueva gorra"}
+                </h3>
+                <button
+                  type="button"
+                  onClick={closeProductModal}
+                  className="text-muted-foreground hover:text-foreground"
+                  aria-label="Cerrar"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveProduct} className="space-y-3">
+                <input
+                  value={productForm.name}
+                  onChange={(e) =>
+                    setProductForm((prev) => ({ ...prev, name: e.target.value }))
+                  }
+                  className="w-full border border-border bg-background px-3 py-2 text-sm"
+                  placeholder="Nombre"
+                  required
+                />
+
+                <input
+                  value={productForm.brand}
+                  onChange={(e) =>
+                    setProductForm((prev) => ({ ...prev, brand: e.target.value }))
+                  }
+                  className="w-full border border-border bg-background px-3 py-2 text-sm"
+                  placeholder="Marca"
+                  required
+                />
+
+                <textarea
+                  value={productForm.description}
+                  onChange={(e) =>
+                    setProductForm((prev) => ({ ...prev, description: e.target.value }))
+                  }
+                  className="w-full border border-border bg-background px-3 py-2 text-sm"
+                  placeholder="Descripción"
+                  rows={3}
+                />
+
+                <div className="grid gap-3 md:grid-cols-2">
                   <input
                     type="number"
                     value={productForm.price}
@@ -597,70 +758,70 @@ export default function AdminPage() {
                     min={0}
                     required
                   />
+                </div>
 
-                  <input
-                    value={productForm.category}
-                    onChange={(e) =>
-                      setProductForm((prev) => ({ ...prev, category: e.target.value }))
-                    }
-                    className="w-full border border-border bg-background px-3 py-2 text-sm"
-                    placeholder="Categoría"
-                    required
-                  />
+                <input
+                  value={productForm.category}
+                  onChange={(e) =>
+                    setProductForm((prev) => ({ ...prev, category: e.target.value }))
+                  }
+                  className="w-full border border-border bg-background px-3 py-2 text-sm"
+                  placeholder="Categoría"
+                  required
+                />
 
-                  <div className="space-y-2">
-                    <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                      Imágenes del producto (máximo 3)
-                    </p>
+                <div className="space-y-2">
+                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Imágenes del producto (máximo 3)
+                  </p>
 
-                    {[0, 1, 2].map((index) => (
-                      <div key={index} className="border border-border p-2">
-                        <label className="mb-2 block text-xs text-muted-foreground">
-                          Imagen {index + 1}
-                        </label>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="mb-2 block w-full text-xs text-muted-foreground"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0]
-                            if (file) {
-                              uploadImage(file, index)
-                            }
-                          }}
-                        />
+                  {[0, 1, 2].map((index) => (
+                    <div key={index} className="border border-border p-2">
+                      <label className="mb-2 block text-xs text-muted-foreground">
+                        Imagen {index + 1}
+                      </label>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="mb-2 block w-full text-xs text-muted-foreground"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0]
+                          if (file) {
+                            uploadImage(file, index)
+                          }
+                        }}
+                      />
 
-                        {uploadingIndex === index && (
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                            Subiendo imagen...
+                      {uploadingIndex === index && (
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          Subiendo imagen...
+                        </div>
+                      )}
+
+                      {productForm.imageUrls[index] && (
+                        <div className="space-y-2">
+                          <Image
+                            src={productForm.imageUrls[index]}
+                            alt={`Vista previa ${index + 1}`}
+                            width={320}
+                            height={180}
+                            className="h-28 w-full object-cover"
+                          />
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="truncate text-xs text-foreground">Imagen cargada</p>
+                            <button
+                              type="button"
+                              onClick={() => setImageAtIndex(index, "")}
+                              className="text-xs font-medium text-destructive"
+                            >
+                              Quitar
+                            </button>
                           </div>
-                        )}
-
-                        {productForm.imageUrls[index] && (
-                          <div className="space-y-2">
-                            <Image
-                              src={productForm.imageUrls[index]}
-                              alt={`Vista previa ${index + 1}`}
-                              width={320}
-                              height={180}
-                              className="h-28 w-full object-cover"
-                            />
-                            <div className="flex items-center justify-between gap-2">
-                              <p className="truncate text-xs text-foreground">Imagen cargada</p>
-                              <button
-                                type="button"
-                                onClick={() => setImageAtIndex(index, "")}
-                                className="text-xs font-medium text-destructive"
-                              >
-                                Quitar
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
 
                 <button
@@ -671,119 +832,8 @@ export default function AdminPage() {
                   {editingProductId ? "Guardar cambios" : "Crear gorra"}
                 </button>
               </form>
-
-              <div className="border border-border bg-card p-4 lg:col-span-2">
-                <h2 className="mb-4 font-display text-lg font-bold uppercase text-foreground">
-                  Mis gorras
-                </h2>
-
-                {products.length === 0 && (
-                  <p className="text-sm text-muted-foreground">
-                    Aún no tienes productos. Crea tu primera gorra para publicarla en la tienda.
-                  </p>
-                )}
-
-                <div className="space-y-3">
-                  {products.map((product) => (
-                    <div
-                      key={product.id}
-                      className="flex flex-col gap-2 border border-border p-3 md:flex-row md:items-center md:justify-between"
-                    >
-                      <div>
-                        <p className="text-sm font-bold text-foreground">{product.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {product.brand} • {product.category} • {statusLabel(product.status)} • Stock: {product.stock} • ${product.price} MXN
-                        </p>
-                      </div>
-
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedProduct(product)}
-                          className="border border-border px-3 py-1 text-xs font-bold uppercase"
-                        >
-                          <span className="inline-flex items-center gap-1">
-                            <Eye className="h-3 w-3" />
-                            Ver
-                          </span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingProductId(product.id)
-                            setProductForm({
-                              name: product.name,
-                              brand: product.brand,
-                              description: product.description,
-                              price: product.price,
-                              stock: product.stock,
-                              imageUrls: [
-                                product.imageUrls[0] || "",
-                                product.imageUrls[1] || "",
-                                product.imageUrls[2] || "",
-                              ],
-                              category: product.category,
-                            })
-                          }}
-                          className="border border-border px-3 py-1 text-xs font-bold uppercase"
-                        >
-                          Editar
-                        </button>
-
-                        {product.status !== "paused" && (
-                          <button
-                            type="button"
-                            onClick={() => updateProductStatus(product.id, "paused")}
-                            className="border border-border px-3 py-1 text-xs font-bold uppercase"
-                          >
-                            <span className="inline-flex items-center gap-1">
-                              <Pause className="h-3 w-3" />
-                              Pausar
-                            </span>
-                          </button>
-                        )}
-
-                        {product.status !== "active" && (
-                          <button
-                            type="button"
-                            onClick={() => updateProductStatus(product.id, "active")}
-                            className="border border-border px-3 py-1 text-xs font-bold uppercase"
-                          >
-                            <span className="inline-flex items-center gap-1">
-                              <Play className="h-3 w-3" />
-                              Activar
-                            </span>
-                          </button>
-                        )}
-
-                        {product.status !== "archived" && (
-                          <button
-                            type="button"
-                            onClick={() => updateProductStatus(product.id, "archived")}
-                            className="flex items-center gap-1 bg-destructive px-3 py-1 text-xs font-bold uppercase text-destructive-foreground"
-                          >
-                            <Archive className="h-3 w-3" />
-                            Archivar
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mt-4 border-t border-border pt-4">
-                  <Link
-                    href="/"
-                    className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground"
-                  >
-                    <Upload className="h-3 w-3" />
-                    Ver mis productos en la tienda
-                  </Link>
-                </div>
-              </div>
             </div>
-          </>
+          </div>
         )}
 
         {selectedProduct && (
