@@ -17,11 +17,12 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    const isSellerRegistration = parsed.data.role === "seller"
+
     const registration = await registerOrReuseUser({
       ...parsed.data,
-      role: "buyer",
-      shopName: undefined,
-      isActive: true,
+      role: isSellerRegistration ? "seller" : "buyer",
+      isActive: isSellerRegistration ? false : true,
     })
 
     if (registration.status === "active_exists") {
@@ -37,6 +38,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json<ApiResponse>(
         { success: false, error: "No se pudo registrar el usuario" },
         { status: 500 }
+      )
+    }
+
+    if (isSellerRegistration) {
+      return NextResponse.json<ApiResponse>(
+        {
+          success: true,
+          data: {
+            pendingApproval: true,
+            message: "Registro recibido. Un administrador debe activar tu cuenta de vendedor.",
+          },
+        },
+        { status: 201 }
       )
     }
 

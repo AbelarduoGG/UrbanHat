@@ -50,6 +50,13 @@ interface AuthContextType {
     apellido: string
     email: string
     password: string
+    wantSeller?: boolean
+    shopName?: string
+    telefono?: string
+    direccion?: string
+    ciudad?: string
+    estado?: string
+    codigoPostal?: string
   }) => Promise<{ success: boolean; error?: string }>
   logout: () => Promise<void>
   updateProfile: (updates: Partial<User>) => void
@@ -109,15 +116,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (response.ok && payload.success && payload.data) {
           const userData = mapApiUserToAuthUser(payload.data)
           setUser(userData)
-          sessionStorage.setItem("urban-hat-session", JSON.stringify(userData))
           setIsLoading(false)
           return
         }
       } catch {
         setUser(null)
       }
-
-      sessionStorage.removeItem("urban-hat-session")
 
       setIsLoading(false)
     }
@@ -141,7 +145,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const userData = mapApiUserToAuthUser(payload.data)
       setUser(userData)
-      sessionStorage.setItem("urban-hat-session", JSON.stringify(userData))
 
       return { success: true, role: userData.role }
     } catch {
@@ -154,6 +157,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     apellido: string
     email: string
     password: string
+    wantSeller?: boolean
+    shopName?: string
+    telefono?: string
+    direccion?: string
+    ciudad?: string
+    estado?: string
+    codigoPostal?: string
   }) => {
     try {
       const response = await fetch("/api/v1/auth/register", {
@@ -163,19 +173,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           name: `${data.nombre} ${data.apellido}`.trim(),
           email: data.email,
           password: data.password,
-          role: "buyer",
+          role: data.wantSeller ? "seller" : "buyer",
+          shopName: data.shopName,
+          telefono: data.telefono,
+          direccion: data.direccion,
+          ciudad: data.ciudad,
+          estado: data.estado,
+          codigoPostal: data.codigoPostal,
         }),
       })
 
-      const payload = (await response.json()) as ApiResponse<UserApi>
+      const payload = (await response.json()) as ApiResponse<UserApi & { pendingApproval?: boolean }>
 
-      if (!response.ok || !payload.success || !payload.data) {
+      if (!response.ok || !payload.success) {
         return { success: false, error: payload.error || "Error al crear la cuenta" }
+      }
+
+      if (payload.data?.pendingApproval) {
+        setUser(null)
+        return { success: true }
+      }
+
+      if (!payload.data) {
+        return { success: false, error: "Error al crear la cuenta" }
       }
 
       const userData = mapApiUserToAuthUser(payload.data)
       setUser(userData)
-      sessionStorage.setItem("urban-hat-session", JSON.stringify(userData))
 
       return { success: true }
     } catch {
@@ -191,7 +215,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     setUser(null)
-    sessionStorage.removeItem("urban-hat-session")
   }
 
   const updateProfile = (updates: Partial<User>) => {
@@ -199,7 +222,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const updatedUser = { ...user, ...updates }
     setUser(updatedUser)
-    sessionStorage.setItem("urban-hat-session", JSON.stringify(updatedUser))
   }
 
   return (

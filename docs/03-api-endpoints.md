@@ -14,18 +14,37 @@ Formato estándar de respuesta:
 ## 1) Autenticación
 
 ### POST `/auth/register`
-Registro público solo para compradores (`buyer`).
+Registro público unificado para compradores (`buyer`) y vendedores (`seller`).
 
 **Body**
 ```json
 {
-  "name": "Juan Perez",
+  "nombre": "Juan",
+  "apellido": "Perez",
   "email": "juan@email.com",
-  "password": "secreto123"
+  "password": "secreto123",
+  "role": "buyer"
 }
 ```
 
-**Response 201**
+**Body (vendedor)**
+```json
+{
+  "nombre": "Maria",
+  "apellido": "Lopez",
+  "email": "maria@tienda.com",
+  "password": "secreto123",
+  "role": "seller",
+  "shopName": "Centro Caps",
+  "telefono": "5551234567",
+  "direccion": "Av. Principal 123",
+  "ciudad": "Monterrey",
+  "estado": "NL",
+  "codigoPostal": "64000"
+}
+```
+
+**Response 201 (buyer)**
 ```json
 {
   "success": true,
@@ -37,6 +56,17 @@ Registro público solo para compradores (`buyer`).
     "isActive": true,
     "createdAt": "2026-02-18T...",
     "token": "jwt..."
+  }
+}
+```
+
+**Response 201 (seller pendiente)**
+```json
+{
+  "success": true,
+  "data": {
+    "pendingApproval": true,
+    "message": "Registro de vendedor creado. Un administrador debe activar tu cuenta para poder iniciar sesión."
   }
 }
 ```
