@@ -1,4 +1,4 @@
-# 03. API Endpoints (Contrato para App Android + Web Admin)
+# 03. API Endpoints (Contrato para PWA + Web Admin)
 
 **Base URL local:** `http://localhost:3000/api/v1`  
 **Base URL producción:** `https://tu-dominio.vercel.app/api/v1`
@@ -72,7 +72,7 @@ Registro público unificado para compradores (`buyer`) y vendedores (`seller`).
 ```
 
 ### POST `/auth/login`
-Login para web (cookie HTTPOnly) y móvil (JWT).
+Login para web (cookie HTTPOnly) y cliente instalable/PWA (JWT en modo API).
 
 **Body**
 ```json
@@ -106,7 +106,7 @@ Limpia cookie web.
 
 ---
 
-## 2) Productos (catálogo móvil)
+## 2) Productos (catálogo PWA)
 
 ### GET `/products`
 Lista productos activos.
@@ -180,7 +180,7 @@ Sube imagen a Cloudinary desde archivo (`multipart/form-data`, campo `file`).
 
 ---
 
-## 3) Órdenes (compras móvil)
+## 3) Órdenes (compras PWA)
 
 ### POST `/orders`
 ### GET `/orders`
@@ -229,7 +229,7 @@ Cambia contraseña del usuario autenticado (incluido superadmin).
 
 ## 5) Flujo recomendado
 
-### Móvil comprador
+### Cliente comprador (PWA)
 - Login -> guardar `token`
 - Consumir `/products`
 - Crear y listar `/orders` con `Authorization: Bearer <token>`

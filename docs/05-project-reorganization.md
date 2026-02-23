@@ -75,7 +75,7 @@ UrbanHat/
 │   ├── cuenta/                    # Perfil usuario (frontend)
 │   ├── login/                     # Login (frontend)
 │   ├── registro/                  # Registro (frontend)
-│   └── api/v1/                    # ← NUEVO: API para app móvil (backend)
+│   └── api/v1/                    # ← NUEVO: API para cliente instalable (PWA)
 │       ├── auth/login/route.ts    # POST /api/v1/auth/login
 │       ├── auth/register/route.ts # POST /api/v1/auth/register
 │       ├── products/route.ts      # GET /api/v1/products
@@ -120,7 +120,7 @@ UrbanHat/
 
 | Carpeta/Archivo | Responsable | Descripción |
 |-----------------|-------------|-------------|
-| `app/api/v1/**` | **Josué (Backend)** | Endpoints REST para app móvil |
+| `app/api/v1/**` | **Josué (Backend)** | Endpoints REST para PWA/cliente instalable |
 | `lib/db/**` | **Josué (Backend)** | Conexión y modelos MongoDB |
 | `lib/services/**` | **Josué (Backend)** | Lógica de negocio |
 | `lib/validations/**` | **Josué (Backend)** | Validación de datos con Zod |

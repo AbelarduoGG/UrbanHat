@@ -1,7 +1,7 @@
 "use client"
 
 import Image from "next/image"
-import { X, ShoppingBag, Minus, Plus } from "lucide-react"
+import { X, ShoppingBag, Minus, Plus, ChevronLeft, ChevronRight } from "lucide-react"
 import { useState } from "react"
 import type { Product } from "@/lib/products"
 import { useCart } from "@/lib/cart-context"
@@ -13,6 +13,8 @@ interface ProductModalProps {
 
 export function ProductModal({ product, onClose }: ProductModalProps) {
   const [quantity, setQuantity] = useState(1)
+  const images = product.images?.length ? product.images : [product.image]
+  const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const { addToCart } = useCart()
 
   const handleAdd = () => {
@@ -48,13 +50,62 @@ export function ProductModal({ product, onClose }: ProductModalProps) {
         </button>
 
         {/* Image */}
-        <div className="relative aspect-square">
+        <div className="relative flex aspect-square flex-col gap-3 p-3">
+          <div className="relative flex-1 overflow-hidden border border-border">
           <Image
-            src={product.images?.[0] || product.image || "/placeholder.svg"}
+            src={images[currentImageIndex] || "/placeholder.svg"}
             alt={product.name}
             fill
             className="object-cover"
           />
+
+            {images.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCurrentImageIndex((prev) => (prev - 1 + images.length) % images.length)
+                  }
+                  className="absolute left-2 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-background/80 text-foreground transition-colors hover:bg-background"
+                  aria-label="Imagen anterior"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setCurrentImageIndex((prev) => (prev + 1) % images.length)}
+                  className="absolute right-2 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-background/80 text-foreground transition-colors hover:bg-background"
+                  aria-label="Siguiente imagen"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </>
+            )}
+          </div>
+
+          {images.length > 1 && (
+            <div className="grid grid-cols-4 gap-2">
+              {images.map((image, index) => (
+                <button
+                  key={`${product.id}-thumb-${index}`}
+                  type="button"
+                  onClick={() => setCurrentImageIndex(index)}
+                  className={`relative aspect-square overflow-hidden border ${
+                    currentImageIndex === index ? "border-accent" : "border-border"
+                  }`}
+                  aria-label={`Ver imagen ${index + 1}`}
+                >
+                  <Image
+                    src={image}
+                    alt={`${product.name} miniatura ${index + 1}`}
+                    fill
+                    className="object-cover"
+                  />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Details */}
