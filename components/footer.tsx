@@ -64,6 +64,14 @@ export function Footer() {
                   Crear Cuenta
                 </Link>
               </li>
+              <li>
+                <Link
+                  href="/registro-vendedor"
+                  className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  Registro Vendedor
+                </Link>
+              </li>
             </ul>
           </div>
 

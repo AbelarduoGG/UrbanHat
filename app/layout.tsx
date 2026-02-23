@@ -11,6 +11,7 @@ export const metadata: Metadata = {
   title: "Urban Hat | Gorras Urbanas",
   description:
     "Gorras urbanas de alta calidad. Estilo streetwear para quienes marcan tendencia. EST. FEB. 2026",
+  manifest: "/manifest.webmanifest",
 }
 
 export const viewport: Viewport = {

@@ -19,6 +19,10 @@ export function Navbar() {
   const { user } = useAuth()
   const [mobileOpen, setMobileOpen] = useState(false)
 
+  const profileHref =
+    user?.role === "superadmin" || user?.role === "seller" ? "/admin" : "/cuenta"
+  const canBuy = !user || user.role === "buyer"
+
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border bg-background/90 backdrop-blur-md">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 lg:px-8">
@@ -53,7 +57,7 @@ export function Navbar() {
           {/* Auth link */}
           {user ? (
             <Link
-              href="/cuenta"
+              href={profileHref}
               className="group flex items-center gap-2 text-muted-foreground transition-colors hover:text-foreground"
               aria-label="Mi cuenta"
             >
@@ -68,29 +72,39 @@ export function Navbar() {
               </span>
             </Link>
           ) : (
-            <Link
-              href="/login"
-              className="flex items-center gap-1.5 text-sm font-medium uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground"
-              aria-label="Iniciar sesion"
-            >
-              <LogIn className="h-5 w-5" />
-              <span className="hidden lg:inline">Ingresar</span>
-            </Link>
+            <div className="hidden items-center gap-3 md:flex">
+              <Link
+                href="/login"
+                className="flex items-center gap-1.5 text-sm font-medium uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground"
+                aria-label="Iniciar sesión"
+              >
+                <LogIn className="h-5 w-5" />
+                <span>Ingresar</span>
+              </Link>
+              <Link
+                href="/registro"
+                className="text-sm font-medium uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground"
+              >
+                Crear cuenta
+              </Link>
+            </div>
           )}
 
-          <button
-            type="button"
-            onClick={() => setIsCartOpen(true)}
-            className="relative text-foreground transition-colors hover:text-accent"
-            aria-label="Abrir carrito"
-          >
-            <ShoppingBag className="h-6 w-6" />
-            {totalItems > 0 && (
-              <span className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-accent text-xs font-bold text-accent-foreground">
-                {totalItems}
-              </span>
-            )}
-          </button>
+          {canBuy && (
+            <button
+              type="button"
+              onClick={() => setIsCartOpen(true)}
+              className="relative text-foreground transition-colors hover:text-accent"
+              aria-label="Abrir carrito"
+            >
+              <ShoppingBag className="h-6 w-6" />
+              {totalItems > 0 && (
+                <span className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-accent text-xs font-bold text-accent-foreground">
+                  {totalItems}
+                </span>
+              )}
+            </button>
+          )}
 
           <button
             type="button"
@@ -125,22 +139,34 @@ export function Navbar() {
             <li className="border-t border-border pt-3">
               {user ? (
                 <Link
-                  href="/cuenta"
+                  href={profileHref}
                   onClick={() => setMobileOpen(false)}
                   className="flex items-center gap-2 py-3 text-sm font-medium uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground"
                 >
                   <User className="h-4 w-4" />
-                  Mi Cuenta
+                  {user.role === "superadmin" || user.role === "seller"
+                    ? "Panel"
+                    : "Mi cuenta"}
                 </Link>
               ) : (
-                <Link
-                  href="/login"
-                  onClick={() => setMobileOpen(false)}
-                  className="flex items-center gap-2 py-3 text-sm font-medium uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  <LogIn className="h-4 w-4" />
-                  Iniciar Sesion
-                </Link>
+                <div className="flex flex-col">
+                  <Link
+                    href="/login"
+                    onClick={() => setMobileOpen(false)}
+                    className="flex items-center gap-2 py-3 text-sm font-medium uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    <LogIn className="h-4 w-4" />
+                    Iniciar sesión
+                  </Link>
+                  <Link
+                    href="/registro"
+                    onClick={() => setMobileOpen(false)}
+                    className="flex items-center gap-2 py-3 text-sm font-medium uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    <User className="h-4 w-4" />
+                    Crear cuenta
+                  </Link>
+                </div>
               )}
             </li>
           </ul>

@@ -2,21 +2,21 @@ import { NextRequest, NextResponse } from "next/server"
 import { createOrder, getOrdersByBuyer } from "@/lib/services/order.service"
 import { createOrderSchema } from "@/lib/validations/order.schema"
 import type { ApiResponse } from "@/lib/types"
+import { getRequestAuth } from "@/lib/auth/request-auth"
 
 /**
  * POST /api/v1/orders
  * Crea una orden (desde app móvil).
  *
- * Header requerido: x-user-id (ID del comprador)
- * TODO: Reemplazar por autenticación real (JWT o NextAuth)
+ * Auth aceptada: cookie de sesión web, bearer JWT o header x-user-id (MVP Android)
  */
 export async function POST(req: NextRequest) {
   try {
-    const buyerId = req.headers.get("x-user-id")
+    const auth = getRequestAuth(req)
 
-    if (!buyerId) {
+    if (!auth) {
       return NextResponse.json<ApiResponse>(
-        { success: false, error: "Se requiere autenticación (x-user-id)" },
+        { success: false, error: "Se requiere autenticación" },
         { status: 401 }
       )
     }
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const order = await createOrder(buyerId, parsed.data)
+    const order = await createOrder(auth.userId, parsed.data)
 
     return NextResponse.json<ApiResponse>(
       { success: true, data: { orderId: order._id.toString() } },
@@ -54,16 +54,16 @@ export async function POST(req: NextRequest) {
  */
 export async function GET(req: NextRequest) {
   try {
-    const buyerId = req.headers.get("x-user-id")
+    const auth = getRequestAuth(req)
 
-    if (!buyerId) {
+    if (!auth) {
       return NextResponse.json<ApiResponse>(
-        { success: false, error: "Se requiere autenticación (x-user-id)" },
+        { success: false, error: "Se requiere autenticación" },
         { status: 401 }
       )
     }
 
-    const orders = await getOrdersByBuyer(buyerId)
+    const orders = await getOrdersByBuyer(auth.userId)
 
     return NextResponse.json<ApiResponse>(
       { success: true, data: orders },

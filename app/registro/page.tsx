@@ -18,7 +18,15 @@ export default function RegisterPage() {
     email: "",
     password: "",
     confirmPassword: "",
+    shopName: "",
+    telefono: "",
+    direccion: "",
+    ciudad: "",
+    estado: "",
+    codigoPostal: "",
   })
+  const [isSeller, setIsSeller] = useState(false)
+  const [successMessage, setSuccessMessage] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const [error, setError] = useState("")
@@ -32,7 +40,7 @@ export default function RegisterPage() {
 
   const allMet = passwordRequirements.every((r) => r.met)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
     setIsSubmitting(true)
@@ -60,14 +68,41 @@ export default function RegisterPage() {
       return
     }
 
-    const result = register({
+    if (
+      isSeller &&
+      (!formData.shopName.trim() ||
+        !formData.telefono.trim() ||
+        !formData.direccion.trim() ||
+        !formData.ciudad.trim() ||
+        !formData.estado.trim() ||
+        !formData.codigoPostal.trim())
+    ) {
+      setError("Para vendedor, completa todos los datos obligatorios")
+      setIsSubmitting(false)
+      return
+    }
+
+    const result = await register({
       nombre: formData.nombre,
       apellido: formData.apellido,
       email: formData.email,
       password: formData.password,
+      wantSeller: isSeller,
+      shopName: formData.shopName,
+      telefono: formData.telefono,
+      direccion: formData.direccion,
+      ciudad: formData.ciudad,
+      estado: formData.estado,
+      codigoPostal: formData.codigoPostal,
     })
 
     if (result.success) {
+      if (isSeller) {
+        setSuccessMessage("Registro enviado. Un administrador debe activar tu cuenta de vendedor.")
+        setIsSubmitting(false)
+        return
+      }
+
       router.push("/cuenta")
     } else {
       setError(result.error || "Error al crear la cuenta")
@@ -301,11 +336,78 @@ export default function RegisterPage() {
                     </p>
                   )}
               </div>
+
+              <div className="border border-border bg-card p-3">
+                <label className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    checked={isSeller}
+                    onChange={(e) => setIsSeller(e.target.checked)}
+                  />
+                  Quiero registrarme como vendedor
+                </label>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Si marcas esta opción, tu cuenta queda pendiente de aprobación por un administrador.
+                </p>
+              </div>
+
+              {isSeller && (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <input
+                    type="text"
+                    value={formData.shopName}
+                    onChange={(e) => updateField("shopName", e.target.value)}
+                    className="w-full border border-border bg-card px-4 py-3.5 text-sm text-foreground"
+                    placeholder="Nombre de tienda"
+                  />
+                  <input
+                    type="text"
+                    value={formData.telefono}
+                    onChange={(e) => updateField("telefono", e.target.value)}
+                    className="w-full border border-border bg-card px-4 py-3.5 text-sm text-foreground"
+                    placeholder="Teléfono"
+                  />
+                  <input
+                    type="text"
+                    value={formData.direccion}
+                    onChange={(e) => updateField("direccion", e.target.value)}
+                    className="w-full border border-border bg-card px-4 py-3.5 text-sm text-foreground sm:col-span-2"
+                    placeholder="Dirección"
+                  />
+                  <input
+                    type="text"
+                    value={formData.ciudad}
+                    onChange={(e) => updateField("ciudad", e.target.value)}
+                    className="w-full border border-border bg-card px-4 py-3.5 text-sm text-foreground"
+                    placeholder="Ciudad"
+                  />
+                  <input
+                    type="text"
+                    value={formData.estado}
+                    onChange={(e) => updateField("estado", e.target.value)}
+                    className="w-full border border-border bg-card px-4 py-3.5 text-sm text-foreground"
+                    placeholder="Estado"
+                  />
+                  <input
+                    type="text"
+                    value={formData.codigoPostal}
+                    onChange={(e) => updateField("codigoPostal", e.target.value)}
+                    className="w-full border border-border bg-card px-4 py-3.5 text-sm text-foreground"
+                    placeholder="Código postal"
+                  />
+                </div>
+              )}
             </div>
 
             {error && (
               <div className="mt-4 border border-destructive/30 bg-destructive/10 px-4 py-3">
                 <p className="text-xs font-medium text-destructive">{error}</p>
+              </div>
+            )}
+
+            {successMessage && (
+              <div className="mt-4 border border-green-500/30 bg-green-500/10 px-4 py-3">
+                <p className="text-xs font-medium text-green-500">{successMessage}</p>
               </div>
             )}
 
@@ -315,7 +417,7 @@ export default function RegisterPage() {
               className="mt-6 flex w-full items-center justify-center gap-2 bg-accent py-4 text-sm font-bold uppercase tracking-widest text-accent-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
             >
               <UserPlus className="h-4 w-4" />
-              {isSubmitting ? "Creando cuenta..." : "Crear Cuenta"}
+              {isSubmitting ? "Creando cuenta..." : isSeller ? "Enviar solicitud" : "Crear Cuenta"}
             </button>
 
             <p className="mt-4 text-center text-xs text-muted-foreground">

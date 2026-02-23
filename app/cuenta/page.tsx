@@ -10,6 +10,7 @@ import {
   User,
   Package,
   MapPin,
+  Lock,
   LogOut,
   Save,
   ArrowLeft,
@@ -19,7 +20,7 @@ import {
 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 
-type Tab = "perfil" | "pedidos" | "direccion"
+type Tab = "perfil" | "pedidos" | "direccion" | "seguridad"
 
 interface Order {
   id: string
@@ -49,6 +50,17 @@ export default function AccountPage() {
     estado: "",
     codigoPostal: "",
   })
+  const [savingProfile, setSavingProfile] = useState(false)
+  const [savingAddress, setSavingAddress] = useState(false)
+  const [savingPassword, setSavingPassword] = useState(false)
+  const [deactivating, setDeactivating] = useState(false)
+  const [accountError, setAccountError] = useState("")
+  const [passwordError, setPasswordError] = useState("")
+  const [passwordData, setPasswordData] = useState({
+    actual: "",
+    nueva: "",
+    confirmar: "",
+  })
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -70,30 +82,163 @@ export default function AccountPage() {
     }
   }, [user, isLoading, router])
 
-  const handleSaveProfile = () => {
-    updateProfile({
-      nombre: profileData.nombre,
-      apellido: profileData.apellido,
-      telefono: profileData.telefono,
-    })
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2500)
+  const handleSaveProfile = async () => {
+    try {
+      setAccountError("")
+      setSavingProfile(true)
+      const response = await fetch("/api/v1/account/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nombre: profileData.nombre,
+          apellido: profileData.apellido,
+          telefono: profileData.telefono,
+        }),
+      })
+
+      const payload = await response.json()
+
+      if (!response.ok || !payload?.success) {
+        return
+      }
+
+      updateProfile({
+        nombre: profileData.nombre,
+        apellido: profileData.apellido,
+        telefono: profileData.telefono,
+      })
+
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2500)
+    } catch {
+      // no-op
+    } finally {
+      setSavingProfile(false)
+    }
   }
 
-  const handleSaveAddress = () => {
-    updateProfile({
-      direccion: addressData.direccion,
-      ciudad: addressData.ciudad,
-      estado: addressData.estado,
-      codigoPostal: addressData.codigoPostal,
-    })
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2500)
+  const handleSaveAddress = async () => {
+    setAccountError("")
+
+    const isSeller = user?.role === "seller"
+    if (
+      isSeller &&
+      (!addressData.direccion.trim() ||
+        !addressData.ciudad.trim() ||
+        !addressData.estado.trim() ||
+        !addressData.codigoPostal.trim())
+    ) {
+      setAccountError("Para vendedores la dirección completa es obligatoria")
+      return
+    }
+
+    try {
+      setSavingAddress(true)
+      const response = await fetch("/api/v1/account/address", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          direccion: addressData.direccion,
+          ciudad: addressData.ciudad,
+          estado: addressData.estado,
+          codigoPostal: addressData.codigoPostal,
+          telefono: profileData.telefono,
+        }),
+      })
+
+      const payload = await response.json()
+
+      if (!response.ok || !payload?.success) {
+        return
+      }
+
+      updateProfile({
+        direccion: addressData.direccion,
+        ciudad: addressData.ciudad,
+        estado: addressData.estado,
+        codigoPostal: addressData.codigoPostal,
+        telefono: profileData.telefono,
+      })
+
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2500)
+    } catch {
+      // no-op
+    } finally {
+      setSavingAddress(false)
+    }
   }
 
-  const handleLogout = () => {
-    logout()
+  const handleLogout = async () => {
+    await logout()
     router.push("/")
+  }
+
+  const handleChangePassword = async () => {
+    setPasswordError("")
+
+    if (!passwordData.actual || !passwordData.nueva || !passwordData.confirmar) {
+      setPasswordError("Todos los campos de contraseña son obligatorios")
+      return
+    }
+
+    if (passwordData.nueva !== passwordData.confirmar) {
+      setPasswordError("La nueva contraseña y su confirmación no coinciden")
+      return
+    }
+
+    try {
+      setSavingPassword(true)
+      const response = await fetch("/api/v1/account/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          currentPassword: passwordData.actual,
+          newPassword: passwordData.nueva,
+        }),
+      })
+
+      const payload = await response.json()
+
+      if (!response.ok || !payload?.success) {
+        setPasswordError(payload?.error || "No se pudo cambiar la contraseña")
+        return
+      }
+
+      setPasswordData({ actual: "", nueva: "", confirmar: "" })
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2500)
+    } catch {
+      setPasswordError("No se pudo cambiar la contraseña")
+    } finally {
+      setSavingPassword(false)
+    }
+  }
+
+  const handleDeactivateAccount = async () => {
+    if (!confirm("¿Seguro que deseas desactivar tu cuenta?")) {
+      return
+    }
+
+    try {
+      setDeactivating(true)
+      const response = await fetch("/api/v1/account/deactivate", {
+        method: "POST",
+      })
+      const payload = await response.json()
+
+      if (!response.ok || !payload?.success) {
+        setPasswordError(payload?.error || "No se pudo desactivar la cuenta")
+        return
+      }
+
+      await logout()
+      router.push("/login")
+    } catch {
+      setPasswordError("No se pudo desactivar la cuenta")
+    } finally {
+      setDeactivating(false)
+    }
   }
 
   if (isLoading || !user) {
@@ -107,10 +252,18 @@ export default function AccountPage() {
     )
   }
 
+  const isBuyer = user.role === "buyer"
+  const isSeller = user.role === "seller"
+
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
     { key: "perfil", label: "Perfil", icon: <User className="h-4 w-4" /> },
-    { key: "pedidos", label: "Pedidos", icon: <Package className="h-4 w-4" /> },
-    { key: "direccion", label: "Direccion", icon: <MapPin className="h-4 w-4" /> },
+    ...(isBuyer
+      ? [{ key: "pedidos" as Tab, label: "Pedidos", icon: <Package className="h-4 w-4" /> }]
+      : []),
+    ...(isBuyer || isSeller
+      ? [{ key: "direccion" as Tab, label: "Direccion", icon: <MapPin className="h-4 w-4" /> }]
+      : []),
+    { key: "seguridad", label: "Seguridad", icon: <Lock className="h-4 w-4" /> },
   ]
 
   return (
@@ -131,6 +284,14 @@ export default function AccountPage() {
             </span>
           </Link>
           <div className="flex items-center gap-4">
+            {(user.role === "superadmin" || user.role === "seller") && (
+              <Link
+                href="/admin"
+                className="text-sm font-medium uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground"
+              >
+                Ir al panel
+              </Link>
+            )}
             <Link
               href="/"
               className="flex items-center gap-2 text-sm font-medium uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground"
@@ -283,10 +444,11 @@ export default function AccountPage() {
                 <button
                   type="button"
                   onClick={handleSaveProfile}
+                  disabled={savingProfile}
                   className="mt-6 flex items-center gap-2 bg-accent px-6 py-3 text-sm font-bold uppercase tracking-widest text-accent-foreground transition-opacity hover:opacity-90"
                 >
                   <Save className="h-4 w-4" />
-                  Guardar Cambios
+                  {savingProfile ? "Guardando..." : "Guardar Cambios"}
                 </button>
               </div>
             )}
@@ -356,8 +518,13 @@ export default function AccountPage() {
                   Direccion de Envio
                 </h2>
                 <p className="mb-6 text-sm text-muted-foreground">
-                  Guarda tu direccion para agilizar futuras compras.
+                  {isSeller
+                    ? "Como vendedor, debes registrar tu dirección completa."
+                    : "Guarda tu dirección para agilizar futuras compras."}
                 </p>
+                {accountError && (
+                  <p className="mb-4 text-xs font-medium text-destructive">{accountError}</p>
+                )}
                 <div className="flex flex-col gap-5">
                   <div>
                     <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-muted-foreground">
@@ -373,6 +540,7 @@ export default function AccountPage() {
                         })
                       }
                       placeholder="Calle, numero, colonia"
+                      required={isSeller}
                       className="w-full border border-border bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-accent"
                     />
                   </div>
@@ -391,6 +559,7 @@ export default function AccountPage() {
                           })
                         }
                         placeholder="Tu ciudad"
+                        required={isSeller}
                         className="w-full border border-border bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-accent"
                       />
                     </div>
@@ -408,6 +577,7 @@ export default function AccountPage() {
                           })
                         }
                         placeholder="Tu estado"
+                        required={isSeller}
                         className="w-full border border-border bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-accent"
                       />
                     </div>
@@ -425,6 +595,7 @@ export default function AccountPage() {
                           })
                         }
                         placeholder="00000"
+                        required={isSeller}
                         className="w-full border border-border bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-accent"
                       />
                     </div>
@@ -433,11 +604,89 @@ export default function AccountPage() {
                 <button
                   type="button"
                   onClick={handleSaveAddress}
+                  disabled={savingAddress}
                   className="mt-6 flex items-center gap-2 bg-accent px-6 py-3 text-sm font-bold uppercase tracking-widest text-accent-foreground transition-opacity hover:opacity-90"
                 >
                   <Save className="h-4 w-4" />
-                  Guardar Direccion
+                  {savingAddress ? "Guardando..." : "Guardar Direccion"}
                 </button>
+              </div>
+            )}
+
+            {activeTab === "seguridad" && (
+              <div className="border border-border bg-card p-6">
+                <h2 className="mb-6 font-display text-lg font-bold uppercase tracking-wider text-foreground">
+                  Cambiar contraseña
+                </h2>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                      Contraseña actual
+                    </label>
+                    <input
+                      type="password"
+                      value={passwordData.actual}
+                      onChange={(e) =>
+                        setPasswordData((prev) => ({ ...prev, actual: e.target.value }))
+                      }
+                      className="w-full border border-border bg-background px-4 py-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                      Nueva contraseña
+                    </label>
+                    <input
+                      type="password"
+                      value={passwordData.nueva}
+                      onChange={(e) =>
+                        setPasswordData((prev) => ({ ...prev, nueva: e.target.value }))
+                      }
+                      className="w-full border border-border bg-background px-4 py-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                      Confirmar nueva contraseña
+                    </label>
+                    <input
+                      type="password"
+                      value={passwordData.confirmar}
+                      onChange={(e) =>
+                        setPasswordData((prev) => ({ ...prev, confirmar: e.target.value }))
+                      }
+                      className="w-full border border-border bg-background px-4 py-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+                    />
+                  </div>
+                </div>
+
+                {passwordError && (
+                  <p className="mt-4 text-xs font-medium text-destructive">{passwordError}</p>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleChangePassword}
+                  disabled={savingPassword}
+                  className="mt-6 flex items-center gap-2 bg-accent px-6 py-3 text-sm font-bold uppercase tracking-widest text-accent-foreground transition-opacity hover:opacity-90"
+                >
+                  <Save className="h-4 w-4" />
+                  {savingPassword ? "Guardando..." : "Actualizar contraseña"}
+                </button>
+
+                {user.role !== "superadmin" && (
+                  <button
+                    type="button"
+                    onClick={handleDeactivateAccount}
+                    disabled={deactivating}
+                    className="mt-3 flex items-center gap-2 border border-destructive px-6 py-3 text-sm font-bold uppercase tracking-widest text-destructive"
+                  >
+                    {deactivating ? "Desactivando..." : "Desactivar cuenta"}
+                  </button>
+                )}
               </div>
             )}
           </div>

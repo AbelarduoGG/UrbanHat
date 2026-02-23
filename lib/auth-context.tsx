@@ -13,6 +13,8 @@ export interface User {
   nombre: string
   apellido: string
   email: string
+  role?: "superadmin" | "seller" | "buyer"
+  isActive?: boolean
   telefono?: string
   direccion?: string
   ciudad?: string
@@ -21,41 +23,84 @@ export interface User {
   createdAt: string
 }
 
-interface StoredUser extends User {
-  password: string
+interface UserApi {
+  id: string
+  name: string
+  email: string
+  role: "superadmin" | "seller" | "buyer"
+  shopName?: string
+  telefono?: string
+  direccion?: string
+  ciudad?: string
+  estado?: string
+  codigoPostal?: string
+  isActive: boolean
+  createdAt: string
 }
 
 interface AuthContextType {
   user: User | null
   isLoading: boolean
-  login: (email: string, password: string) => { success: boolean; error?: string }
+  login: (
+    email: string,
+    password: string
+  ) => Promise<{ success: boolean; error?: string; role?: "superadmin" | "seller" | "buyer" }>
   register: (data: {
     nombre: string
     apellido: string
     email: string
     password: string
-  }) => { success: boolean; error?: string }
-  logout: () => void
+    wantSeller?: boolean
+    shopName?: string
+    telefono?: string
+    direccion?: string
+    ciudad?: string
+    estado?: string
+    codigoPostal?: string
+  }) => Promise<{ success: boolean; error?: string }>
+  logout: () => Promise<void>
   updateProfile: (updates: Partial<User>) => void
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-function getStoredUsers(): StoredUser[] {
-  if (typeof window === "undefined") return []
-  const stored = localStorage.getItem("urban-hat-users")
-  if (stored) {
-    try {
-      return JSON.parse(stored)
-    } catch {
-      return []
-    }
-  }
-  return []
+interface ApiResponse<T = unknown> {
+  success: boolean
+  data?: T
+  error?: string
 }
 
-function saveStoredUsers(users: StoredUser[]) {
-  localStorage.setItem("urban-hat-users", JSON.stringify(users))
+function parseName(name: string) {
+  const trimmed = name.trim()
+
+  if (!trimmed) {
+    return { nombre: "", apellido: "" }
+  }
+
+  const parts = trimmed.split(/\s+/)
+  const nombre = parts[0] ?? ""
+  const apellido = parts.slice(1).join(" ")
+
+  return { nombre, apellido }
+}
+
+function mapApiUserToAuthUser(user: UserApi): User {
+  const { nombre, apellido } = parseName(user.name)
+
+  return {
+    id: user.id,
+    nombre,
+    apellido,
+    email: user.email,
+    role: user.role,
+    isActive: user.isActive,
+    telefono: user.telefono,
+    direccion: user.direccion,
+    ciudad: user.ciudad,
+    estado: user.estado,
+    codigoPostal: user.codigoPostal,
+    createdAt: user.createdAt,
+  }
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -63,72 +108,113 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    const session = sessionStorage.getItem("urban-hat-session")
-    if (session) {
+    const hydrateAuth = async () => {
       try {
-        setUser(JSON.parse(session))
+        const response = await fetch("/api/v1/auth/me")
+        const payload = (await response.json()) as ApiResponse<UserApi>
+
+        if (response.ok && payload.success && payload.data) {
+          const userData = mapApiUserToAuthUser(payload.data)
+          setUser(userData)
+          setIsLoading(false)
+          return
+        }
       } catch {
-        sessionStorage.removeItem("urban-hat-session")
+        setUser(null)
       }
+
+      setIsLoading(false)
     }
-    setIsLoading(false)
+
+    hydrateAuth()
   }, [])
 
-  const login = (email: string, password: string) => {
-    const users = getStoredUsers()
-    const found = users.find(
-      (u) => u.email.toLowerCase() === email.toLowerCase()
-    )
+  const login = async (email: string, password: string) => {
+    try {
+      const response = await fetch("/api/v1/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      })
 
-    if (!found) {
-      return { success: false, error: "No se encontro una cuenta con ese email" }
+      const payload = (await response.json()) as ApiResponse<UserApi>
+
+      if (!response.ok || !payload.success || !payload.data) {
+        return { success: false, error: payload.error || "Error al iniciar sesion" }
+      }
+
+      const userData = mapApiUserToAuthUser(payload.data)
+      setUser(userData)
+
+      return { success: true, role: userData.role }
+    } catch {
+      return { success: false, error: "No se pudo conectar con el servidor" }
     }
-
-    if (found.password !== password) {
-      return { success: false, error: "Contrasena incorrecta" }
-    }
-
-    const { password: _, ...userData } = found
-    setUser(userData)
-    sessionStorage.setItem("urban-hat-session", JSON.stringify(userData))
-    return { success: true }
   }
 
-  const register = (data: {
+  const register = async (data: {
     nombre: string
     apellido: string
     email: string
     password: string
+    wantSeller?: boolean
+    shopName?: string
+    telefono?: string
+    direccion?: string
+    ciudad?: string
+    estado?: string
+    codigoPostal?: string
   }) => {
-    const users = getStoredUsers()
-    const exists = users.find(
-      (u) => u.email.toLowerCase() === data.email.toLowerCase()
-    )
+    try {
+      const response = await fetch("/api/v1/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: `${data.nombre} ${data.apellido}`.trim(),
+          email: data.email,
+          password: data.password,
+          role: data.wantSeller ? "seller" : "buyer",
+          shopName: data.shopName,
+          telefono: data.telefono,
+          direccion: data.direccion,
+          ciudad: data.ciudad,
+          estado: data.estado,
+          codigoPostal: data.codigoPostal,
+        }),
+      })
 
-    if (exists) {
-      return { success: false, error: "Ya existe una cuenta con ese email" }
+      const payload = (await response.json()) as ApiResponse<UserApi & { pendingApproval?: boolean }>
+
+      if (!response.ok || !payload.success) {
+        return { success: false, error: payload.error || "Error al crear la cuenta" }
+      }
+
+      if (payload.data?.pendingApproval) {
+        setUser(null)
+        return { success: true }
+      }
+
+      if (!payload.data) {
+        return { success: false, error: "Error al crear la cuenta" }
+      }
+
+      const userData = mapApiUserToAuthUser(payload.data)
+      setUser(userData)
+
+      return { success: true }
+    } catch {
+      return { success: false, error: "No se pudo conectar con el servidor" }
     }
-
-    const newUser: StoredUser = {
-      id: `user-${Date.now().toString(36)}`,
-      nombre: data.nombre,
-      apellido: data.apellido,
-      email: data.email,
-      password: data.password,
-      createdAt: new Date().toISOString(),
-    }
-
-    saveStoredUsers([...users, newUser])
-
-    const { password: _, ...userData } = newUser
-    setUser(userData)
-    sessionStorage.setItem("urban-hat-session", JSON.stringify(userData))
-    return { success: true }
   }
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await fetch("/api/v1/auth/logout", { method: "POST" })
+    } catch {
+      // no-op
+    }
+
     setUser(null)
-    sessionStorage.removeItem("urban-hat-session")
   }
 
   const updateProfile = (updates: Partial<User>) => {
@@ -136,13 +222,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const updatedUser = { ...user, ...updates }
     setUser(updatedUser)
-    sessionStorage.setItem("urban-hat-session", JSON.stringify(updatedUser))
-
-    const users = getStoredUsers()
-    const updatedUsers = users.map((u) =>
-      u.id === user.id ? { ...u, ...updates } : u
-    )
-    saveStoredUsers(updatedUsers)
   }
 
   return (

@@ -2,7 +2,7 @@
 
 import React from "react"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import {
@@ -18,6 +18,8 @@ import {
   Lock,
 } from "lucide-react"
 import { useCart } from "@/lib/cart-context"
+import { useAuth } from "@/lib/auth-context"
+import { useRouter } from "next/navigation"
 
 type Step = "cart" | "shipping" | "payment" | "confirmation"
 
@@ -45,6 +47,8 @@ const SHIPPING_COST = 99
 const FREE_SHIPPING_MIN = 999
 
 export default function CheckoutPage() {
+  const router = useRouter()
+  const { user, isLoading } = useAuth()
   const {
     items,
     removeFromCart,
@@ -78,6 +82,27 @@ export default function CheckoutPage() {
   })
 
   const [errors, setErrors] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    if (isLoading) return
+
+    if (!user) {
+      router.replace("/login?next=/checkout")
+      return
+    }
+
+    if (user.role !== "buyer") {
+      router.replace("/login")
+    }
+  }, [isLoading, user, router])
+
+  if (isLoading || !user || user.role !== "buyer") {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <p className="text-sm text-muted-foreground">Verificando sesión...</p>
+      </div>
+    )
+  }
 
   const shippingCost = totalPrice >= FREE_SHIPPING_MIN ? 0 : SHIPPING_COST
   const grandTotal = totalPrice + shippingCost

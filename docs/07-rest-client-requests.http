@@ -1,0 +1,208 @@
+### UrbanHat API - Flujo de roles (REST Client)
+### Ejecuta cada bloque con "Send Request" en VS Code.
+### Requiere tener corriendo: npm run dev
+
+@baseUrl = http://localhost:3000/api/v1
+
+### -----------------------------------------------------------------
+### Variables (ajusta si cambiaste tu .env.local)
+### -----------------------------------------------------------------
+
+@seedKey = superadminseedkey123
+@superadminEmail = superadmin@test.com
+@superadminPassword = superadmin123
+
+@sellerName = Seller Demo
+@sellerEmail = seller1@test.com
+@sellerPassword = seller123
+@sellerShop = Caps Norte
+
+### -----------------------------------------------------------------
+### 1) Seed de superadmin (solo una vez)
+### Crea el superadmin si no existe.
+### -----------------------------------------------------------------
+
+POST {{baseUrl}}/admin/seed-superadmin
+x-seed-key: {{seedKey}}
+Content-Type: application/json
+
+{}
+
+### -----------------------------------------------------------------
+### 2) Login superadmin
+### Obtiene token JWT + cookie. Usaremos token para requests API.
+### -----------------------------------------------------------------
+
+# @name loginSuperadmin
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{superadminEmail}}",
+  "password": "{{superadminPassword}}"
+}
+
+### Token del superadmin (se toma del response anterior)
+@superadminToken = {{loginSuperadmin.response.body.$.data.token}}
+
+### -----------------------------------------------------------------
+### 3) Ver perfil autenticado (superadmin)
+### Debe regresar role: "superadmin"
+### -----------------------------------------------------------------
+
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{superadminToken}}
+
+### -----------------------------------------------------------------
+### 4) Crear seller (solo superadmin)
+### Este endpoint NO lo puede usar buyer/seller normal.
+### -----------------------------------------------------------------
+
+# @name createSeller
+POST {{baseUrl}}/admin/sellers
+Authorization: Bearer {{superadminToken}}
+Content-Type: application/json
+
+{
+  "name": "{{sellerName}}",
+  "email": "{{sellerEmail}}",
+  "password": "{{sellerPassword}}",
+  "shopName": "{{sellerShop}}"
+}
+
+### -----------------------------------------------------------------
+### 5) Login seller
+### Obtiene token JWT del seller para su dashboard/API.
+### -----------------------------------------------------------------
+
+# @name loginSeller
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{sellerEmail}}",
+  "password": "{{sellerPassword}}"
+}
+
+@sellerToken = {{loginSeller.response.body.$.data.token}}
+
+### -----------------------------------------------------------------
+### 6) Ver perfil autenticado (seller)
+### Debe regresar role: "seller"
+### -----------------------------------------------------------------
+
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{sellerToken}}
+
+### -----------------------------------------------------------------
+### 7) Seller crea producto
+### Solo seller puede crear productos.
+### -----------------------------------------------------------------
+
+# @name createProductAsSeller
+POST {{baseUrl}}/products
+Authorization: Bearer {{sellerToken}}
+Content-Type: application/json
+
+{
+  "name": "Gorra Demo Seller",
+  "description": "Producto creado por seller vía API",
+  "price": 499,
+  "stock": 12,
+  "imageUrl": "https://res.cloudinary.com/demo/image/upload/sample.jpg",
+  "category": "Snapback"
+}
+
+@productId = {{createProductAsSeller.response.body.$.data.id}}
+
+### -----------------------------------------------------------------
+### 8) Seller lista sus productos (mine=true)
+### Solo trae productos del seller autenticado.
+### -----------------------------------------------------------------
+
+GET {{baseUrl}}/products?mine=true
+Authorization: Bearer {{sellerToken}}
+
+### -----------------------------------------------------------------
+### 9) Seller actualiza su producto
+### Si intenta actualizar producto de otro seller, debe fallar.
+### -----------------------------------------------------------------
+
+PATCH {{baseUrl}}/products/{{productId}}
+Authorization: Bearer {{sellerToken}}
+Content-Type: application/json
+
+{
+  "price": 549,
+  "stock": 10
+}
+
+### -----------------------------------------------------------------
+### 10) Seller elimina su producto (soft delete)
+### -----------------------------------------------------------------
+
+DELETE {{baseUrl}}/products/{{productId}}
+Authorization: Bearer {{sellerToken}}
+
+### -----------------------------------------------------------------
+### 11) Superadmin lista usuarios
+### Debe incluir superadmin/seller/buyer (sin password).
+### -----------------------------------------------------------------
+
+GET {{baseUrl}}/admin/users
+Authorization: Bearer {{superadminToken}}
+
+### -----------------------------------------------------------------
+### 12) Cambio de contraseña (usuario autenticado)
+### Puede usarlo superadmin o seller con su propio token.
+### -----------------------------------------------------------------
+
+POST {{baseUrl}}/admin/change-password
+Authorization: Bearer {{superadminToken}}
+Content-Type: application/json
+
+{
+  "currentPassword": "{{superadminPassword}}",
+  "newPassword": "superadmin1234"
+}
+
+### -----------------------------------------------------------------
+### 13) Register buyer (público)
+### Registro normal de comprador para app móvil/web.
+### -----------------------------------------------------------------
+
+# @name registerBuyer
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "name": "Buyer Demo",
+  "email": "buyer1@test.com",
+  "password": "buyer123"
+}
+
+@buyerToken = {{registerBuyer.response.body.$.data.token}}
+
+### -----------------------------------------------------------------
+### 14) Buyer guarda dirección de envío en DB
+### Persistencia real de dirección en MongoDB.
+### -----------------------------------------------------------------
+
+PUT {{baseUrl}}/account/address
+Authorization: Bearer {{buyerToken}}
+Content-Type: application/json
+
+{
+  "direccion": "Calle Principal 123",
+  "ciudad": "Monterrey",
+  "estado": "Nuevo Leon",
+  "codigoPostal": "64000",
+  "telefono": "8112345678"
+}
+
+### -----------------------------------------------------------------
+### Notas rápidas
+### - Si seed devuelve created:false, significa que superadmin ya existe (correcto).
+### - Si falla seed con 401, revisa ADMIN_SEED_KEY en .env.local (sin espacios).
+### - Para Cloudinary, en imageUrl usa la URL pública segura que te devuelve Cloudinary.
+### -----------------------------------------------------------------

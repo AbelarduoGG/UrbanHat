@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { registerSchema } from "@/lib/validations/auth.schema"
-import { findUserByEmail, createUser } from "@/lib/services/auth.service"
-import type { ApiResponse } from "@/lib/types"
+import { registerOrReuseUser } from "@/lib/services/auth.service"
+import type { ApiResponse, UserPublic } from "@/lib/types"
+import { AUTH_COOKIE_NAME, serializeSession } from "@/lib/auth/session"
+import { signAuthToken } from "@/lib/auth/jwt"
 
 export async function POST(req: NextRequest) {
   try {
@@ -15,29 +17,81 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const existing = await findUserByEmail(parsed.data.email)
+    const isSellerRegistration = parsed.data.role === "seller"
 
-    if (existing) {
+    const registration = await registerOrReuseUser({
+      ...parsed.data,
+      role: isSellerRegistration ? "seller" : "buyer",
+      isActive: isSellerRegistration ? false : true,
+    })
+
+    if (registration.status === "active_exists") {
       return NextResponse.json<ApiResponse>(
         { success: false, error: "El email ya está registrado" },
         { status: 409 }
       )
     }
 
-    const user = await createUser(parsed.data)
+    const user = registration.user
 
-    return NextResponse.json<ApiResponse>(
-      {
-        success: true,
-        data: {
-          id: user._id.toString(),
-          name: user.name,
-          email: user.email,
-          role: user.role,
+    if (!user) {
+      return NextResponse.json<ApiResponse>(
+        { success: false, error: "No se pudo registrar el usuario" },
+        { status: 500 }
+      )
+    }
+
+    if (isSellerRegistration) {
+      return NextResponse.json<ApiResponse>(
+        {
+          success: true,
+          data: {
+            pendingApproval: true,
+            message: "Registro recibido. Un administrador debe activar tu cuenta de vendedor.",
+          },
         },
-      },
+        { status: 201 }
+      )
+    }
+
+    const userPublic: UserPublic = {
+      id: user._id.toString(),
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      shopName: user.shopName,
+      isActive: user.isActive,
+      createdAt: user.createdAt.toISOString(),
+    }
+
+    const token = signAuthToken({
+      sub: user._id.toString(),
+      email: user.email,
+      role: user.role,
+      name: user.name,
+    })
+
+    const response = NextResponse.json<ApiResponse<UserPublic & { token: string }>>(
+      { success: true, data: { ...userPublic, token } },
       { status: 201 }
     )
+
+    response.cookies.set({
+      name: AUTH_COOKIE_NAME,
+      value: serializeSession({
+        id: user._id.toString(),
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      }),
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 7,
+    })
+
+    return response
   } catch (error) {
     console.error("[POST /api/v1/auth/register]", error)
     return NextResponse.json<ApiResponse>(

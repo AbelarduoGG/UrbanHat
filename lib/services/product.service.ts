@@ -3,8 +3,13 @@ import { Product, type IProduct } from "@/lib/db/models"
 
 export async function getAllProducts(onlyActive = true) {
   await connectDB()
-  const filter = onlyActive ? { isActive: true } : {}
-  return Product.find(filter).lean()
+  const filter = onlyActive
+    ? { isActive: true, status: "active" }
+    : {}
+  return Product.find(filter)
+    .populate("sellerId", "name shopName")
+    .sort({ _id: -1 })
+    .lean()
 }
 
 export async function getProductById(id: string) {
@@ -14,7 +19,7 @@ export async function getProductById(id: string) {
 
 export async function getProductsBySeller(sellerId: string) {
   await connectDB()
-  return Product.find({ sellerId, isActive: true }).lean()
+  return Product.find({ sellerId, isActive: true }).sort({ _id: -1 }).lean()
 }
 
 export async function createProduct(data: Partial<IProduct>) {
@@ -32,16 +37,16 @@ export async function updateProduct(
   return Product.findOneAndUpdate(
     { _id: id, sellerId },
     { $set: data },
-    { new: true }
+    { new: true, runValidators: true }
   ).lean()
 }
 
 export async function deleteProduct(id: string, sellerId: string) {
   await connectDB()
-  // Soft delete
+  // Archivar producto
   return Product.findOneAndUpdate(
     { _id: id, sellerId },
-    { $set: { isActive: false } },
+    { $set: { status: "archived" } },
     { new: true }
   ).lean()
 }
