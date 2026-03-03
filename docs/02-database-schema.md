@@ -28,7 +28,11 @@ const ProductSchema = new Schema({
   price: { type: Number, required: true, min: 0 },
   stock: { type: Number, required: true, min: 0 }, // Inventario físico
   imageUrl: { type: String, required: true }, // URL externa
-  category: { type: String, default: 'General' },
+  category: {
+    type: String,
+    enum: ['Snapback', 'Fitted', 'Trucker', 'Dad Hat', 'Flat Brim', '5 Panels', 'Bucket Hat', 'Military'],
+    default: 'Snapback'
+  },
   isActive: { type: Boolean, default: true } // Soft delete
 });
 

@@ -8,6 +8,7 @@ import { useCart } from "@/lib/cart-context"
 import { useAuth } from "@/lib/auth-context"
 import { useProducts } from "@/lib/products-context"
 import { ProductModal } from "@/components/product-modal"
+import { PRODUCT_CATEGORIES } from "@/lib/constants/product-categories"
 
 function normalizeText(value: string) {
   return value
@@ -144,10 +145,7 @@ export function ProductsSection() {
   const { products, isLoading } = useProducts()
   const canBuy = !user || user.role === "buyer"
 
-  const categories = useMemo(() => {
-    const unique = Array.from(new Set(products.map((p) => p.category).filter(Boolean)))
-    return ["Todas", ...unique]
-  }, [products])
+  const categories = ["Todas", ...PRODUCT_CATEGORIES]
 
   const filtered = useMemo(() => {
     const term = normalizeText(search)

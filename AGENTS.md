@@ -1,6 +1,3 @@
-# AGENTS.md — Reglas de colaboración con Copilot (UrbanHat)
-
-Este archivo define cómo debe comportarse Copilot durante el desarrollo del proyecto.
 
 ## 1) Principios generales
 
@@ -67,6 +64,7 @@ Copilot debe intentar ejecutar validaciones proporcionales al cambio:
 2. No reescribir UI si el objetivo es backend.
 3. No agregar dependencias sin necesidad real.
 4. No romper el flujo actual del frontend mientras se migra a backend real.
+5. Todo paquete/dependencia debe instalarse con `pnpm` (no usar `npm install` ni `yarn`) para mantener un único lockfile coherente (`pnpm-lock.yaml`).
 
 ## 9) Formato de respuesta esperado de Copilot
 

@@ -28,6 +28,7 @@ import {
   YAxis,
 } from "recharts"
 import { useAuth } from "@/lib/auth-context"
+import { PRODUCT_CATEGORIES } from "@/lib/constants/product-categories"
 
 type Role = "superadmin" | "seller" | "buyer"
 type ProductStatus = "active" | "paused" | "archived"
@@ -83,6 +84,40 @@ interface DashboardMetrics {
   tasaComision: number
 }
 
+interface OrderItemDto {
+  productId: string
+  sellerId: string
+  name: string
+  quantity: number
+  priceAtPurchase: number
+}
+
+interface OrderDto {
+  _id: string
+  buyerId?: {
+    _id?: string
+    name?: string
+    email?: string
+  }
+  items: OrderItemDto[]
+  totalAmount: number
+  status: string
+  shippingStatus?: "seller_received" | "preparing" | "shipped" | "delivered"
+  createdAt: string
+}
+
+interface SellerSaleRow {
+  orderId: string
+  date: string
+  buyerName: string
+  buyerEmail: string
+  productName: string
+  quantity: number
+  unitPrice: number
+  subtotal: number
+  shippingStatus: string
+}
+
 interface ProductForm {
   name: string
   brand: string
@@ -90,7 +125,7 @@ interface ProductForm {
   price: number
   stock: number
   imageUrls: string[]
-  category: string
+  category: (typeof PRODUCT_CATEGORIES)[number]
 }
 
 const emptyProduct: ProductForm = {
@@ -100,7 +135,7 @@ const emptyProduct: ProductForm = {
   price: 0,
   stock: 0,
   imageUrls: ["", "", ""],
-  category: "General",
+  category: "Snapback",
 }
 
 function roleLabel(role: Role) {
@@ -113,6 +148,20 @@ function statusLabel(status: ProductStatus) {
   if (status === "active") return "Activo"
   if (status === "paused") return "Pausado"
   return "Archivado"
+}
+
+function shippingStatusLabel(status?: string) {
+  if (status === "seller_received") return "Pendiente de envío"
+  if (status === "preparing") return "Preparando"
+  if (status === "shipped") return "Enviado"
+  if (status === "delivered") return "Entregado"
+  return "Pendiente"
+}
+
+function normalizeProductCategory(value: string): (typeof PRODUCT_CATEGORIES)[number] {
+  return PRODUCT_CATEGORIES.includes(value as (typeof PRODUCT_CATEGORIES)[number])
+    ? (value as (typeof PRODUCT_CATEGORIES)[number])
+    : "Snapback"
 }
 
 export default function AdminPage() {
@@ -130,6 +179,15 @@ export default function AdminPage() {
   const [selectedProduct, setSelectedProduct] = useState<SellerProduct | null>(null)
   const [uploadingIndex, setUploadingIndex] = useState<number | null>(null)
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null)
+  const [salesRows, setSalesRows] = useState<SellerSaleRow[]>([])
+  const [loadingSales, setLoadingSales] = useState(false)
+  const [adminProducts, setAdminProducts] = useState<SellerProduct[]>([])
+  const [adminFilters, setAdminFilters] = useState({
+    sellerId: "all",
+    category: "all",
+    minPrice: "",
+    maxPrice: "",
+  })
 
   const title = useMemo(() => {
     if (me?.role === "superadmin") return "Panel de administración"
@@ -171,13 +229,28 @@ export default function AdminPage() {
 
     if (me.role === "superadmin") {
       refreshUsers()
+      refreshAdminProducts()
       return
     }
 
     if (me.role === "seller") {
       refreshMyProducts()
+      refreshSellerSales()
     }
   }, [me])
+
+  useEffect(() => {
+    const hasOpenModal = isProductModalOpen || Boolean(selectedProduct)
+
+    if (!hasOpenModal) return
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [isProductModalOpen, selectedProduct])
 
   const refreshMetrics = async () => {
     const response = await fetch("/api/v1/admin/metrics")
@@ -200,6 +273,59 @@ export default function AdminPage() {
     const payload = (await response.json()) as ApiResponse<SellerProduct[]>
     if (response.ok && payload.success && payload.data) {
       setProducts(payload.data)
+    }
+  }
+
+  const refreshAdminProducts = async () => {
+    const response = await fetch("/api/v1/products?all=true")
+    const payload = (await response.json()) as ApiResponse<SellerProduct[]>
+
+    if (response.ok && payload.success && payload.data) {
+      setAdminProducts(payload.data)
+    }
+  }
+
+  const refreshSellerSales = async () => {
+    try {
+      setLoadingSales(true)
+
+      const response = await fetch("/api/v1/orders?scope=seller")
+      const payload = (await response.json()) as ApiResponse<OrderDto[]>
+
+      if (!response.ok || !payload.success || !payload.data) {
+        setSalesRows([])
+        return
+      }
+
+      const rows: SellerSaleRow[] = []
+
+      for (const order of payload.data) {
+        const sellerItems = (order.items || []).filter(
+          (item) => String(item.sellerId) === String(me?.id)
+        )
+
+        for (const item of sellerItems) {
+          rows.push({
+            orderId: order._id,
+            date: new Date(order.createdAt).toLocaleDateString("es-MX", {
+              year: "numeric",
+              month: "short",
+              day: "numeric",
+            }),
+            buyerName: order.buyerId?.name || "Cliente",
+            buyerEmail: order.buyerId?.email || "-",
+            productName: item.name,
+            quantity: item.quantity,
+            unitPrice: Number(item.priceAtPurchase || 0),
+            subtotal: Number(item.priceAtPurchase || 0) * Number(item.quantity || 0),
+            shippingStatus: order.shippingStatus || "seller_received",
+          })
+        }
+      }
+
+      setSalesRows(rows)
+    } finally {
+      setLoadingSales(false)
     }
   }
 
@@ -290,7 +416,7 @@ export default function AdminPage() {
         product.imageUrls[1] || "",
         product.imageUrls[2] || "",
       ],
-      category: product.category,
+      category: normalizeProductCategory(product.category),
     })
     setIsProductModalOpen(true)
   }
@@ -305,31 +431,35 @@ export default function AdminPage() {
       return
     }
 
-    const endpoint = editingProductId
-      ? `/api/v1/products/${editingProductId}`
-      : "/api/v1/products"
+    try {
+      const endpoint = editingProductId
+        ? `/api/v1/products/${editingProductId}`
+        : "/api/v1/products"
 
-    const method = editingProductId ? "PATCH" : "POST"
+      const method = editingProductId ? "PATCH" : "POST"
 
-    const response = await fetch(endpoint, {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...productForm,
-        imageUrls: validImages,
-      }),
-    })
+      const response = await fetch(endpoint, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...productForm,
+          imageUrls: validImages,
+        }),
+      })
 
-    const payload = (await response.json()) as ApiResponse
-    if (!response.ok || !payload.success) {
-      setMessage(payload.error || "No se pudo guardar la gorra")
-      return
+      const payload = (await response.json()) as ApiResponse
+      if (!response.ok || !payload.success) {
+        setMessage(payload.error || "No se pudo guardar la gorra")
+        return
+      }
+
+      setMessage(editingProductId ? "Gorra actualizada" : "Gorra creada")
+      closeProductModal()
+      await refreshMyProducts()
+      await refreshMetrics()
+    } catch {
+      setMessage("No se pudo guardar la gorra")
     }
-
-    setMessage(editingProductId ? "Gorra actualizada" : "Gorra creada")
-    closeProductModal()
-    await refreshMyProducts()
-    await refreshMetrics()
   }
 
   const updateProductStatus = async (productId: string, status: ProductStatus) => {
@@ -351,14 +481,6 @@ export default function AdminPage() {
     await refreshMetrics()
   }
 
-  if (isLoading || !me) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background text-muted-foreground">
-        Cargando panel...
-      </div>
-    )
-  }
-
   const adminChartData = metrics
     ? [
         { name: "Usuarios", valor: metrics.totalUsuarios || 0 },
@@ -376,6 +498,42 @@ export default function AdminPage() {
         { name: "Neto", valor: Number((metrics.neto || 0).toFixed(2)) },
       ]
     : []
+
+  const adminSellerOptions = useMemo(() => {
+    const map = new Map<string, string>()
+
+    for (const product of adminProducts) {
+      if (product.sellerId && product.sellerName) {
+        map.set(product.sellerId, product.sellerName)
+      }
+    }
+
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }))
+  }, [adminProducts])
+
+  const filteredAdminProducts = useMemo(() => {
+    const min = adminFilters.minPrice ? Number(adminFilters.minPrice) : null
+    const max = adminFilters.maxPrice ? Number(adminFilters.maxPrice) : null
+
+    return adminProducts.filter((product) => {
+      const matchesSeller =
+        adminFilters.sellerId === "all" || product.sellerId === adminFilters.sellerId
+      const matchesCategory =
+        adminFilters.category === "all" || product.category === adminFilters.category
+      const matchesMin = min === null || product.price >= min
+      const matchesMax = max === null || product.price <= max
+
+      return matchesSeller && matchesCategory && matchesMin && matchesMax
+    })
+  }, [adminProducts, adminFilters])
+
+  if (isLoading || !me) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background text-muted-foreground">
+        Cargando panel...
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-background px-4 py-8 lg:px-8">
@@ -466,7 +624,7 @@ export default function AdminPage() {
                 Usuarios del sistema
               </h2>
               <p className="mb-4 text-xs text-muted-foreground">
-                El registro de vendedores es público desde "Registro Vendedor"; aquí solo gestionas activación y roles.
+                El registro de vendedores es público desde &quot;Registro Vendedor&quot;; aquí solo gestionas activación y roles.
               </p>
               <div className="space-y-3">
                 {users.map((user) => {
@@ -518,6 +676,99 @@ export default function AdminPage() {
                 })}
               </div>
             </div>
+
+            <div className="mt-6 border border-border bg-card p-4">
+              <h2 className="mb-4 font-display text-lg font-bold uppercase text-foreground">
+                Productos del marketplace
+              </h2>
+
+              <div className="mb-4 grid gap-3 md:grid-cols-4">
+                <select
+                  value={adminFilters.sellerId}
+                  onChange={(e) =>
+                    setAdminFilters((prev) => ({ ...prev, sellerId: e.target.value }))
+                  }
+                  className="w-full border border-border bg-background px-3 py-2 text-xs uppercase tracking-wider"
+                >
+                  <option value="all">Todos los vendedores</option>
+                  {adminSellerOptions.map((seller) => (
+                    <option key={seller.id} value={seller.id}>
+                      {seller.name}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={adminFilters.category}
+                  onChange={(e) =>
+                    setAdminFilters((prev) => ({ ...prev, category: e.target.value }))
+                  }
+                  className="w-full border border-border bg-background px-3 py-2 text-xs uppercase tracking-wider"
+                >
+                  <option value="all">Todas las categorías</option>
+                  {PRODUCT_CATEGORIES.map((category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
+                </select>
+
+                <input
+                  type="number"
+                  min={0}
+                  value={adminFilters.minPrice}
+                  onChange={(e) =>
+                    setAdminFilters((prev) => ({ ...prev, minPrice: e.target.value }))
+                  }
+                  placeholder="Precio mínimo"
+                  className="w-full border border-border bg-background px-3 py-2 text-xs uppercase tracking-wider"
+                />
+
+                <input
+                  type="number"
+                  min={0}
+                  value={adminFilters.maxPrice}
+                  onChange={(e) =>
+                    setAdminFilters((prev) => ({ ...prev, maxPrice: e.target.value }))
+                  }
+                  placeholder="Precio máximo"
+                  className="w-full border border-border bg-background px-3 py-2 text-xs uppercase tracking-wider"
+                />
+              </div>
+
+              <div className="w-full overflow-x-auto">
+                <table className="w-full min-w-[980px] border-collapse">
+                  <thead>
+                    <tr className="border-b border-border text-left text-xs uppercase tracking-wider text-muted-foreground">
+                      <th className="px-3 py-2">Producto</th>
+                      <th className="px-3 py-2">Vendedor</th>
+                      <th className="px-3 py-2">Categoría</th>
+                      <th className="px-3 py-2">Estado</th>
+                      <th className="px-3 py-2">Stock</th>
+                      <th className="px-3 py-2">Precio</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredAdminProducts.map((product) => (
+                      <tr key={product.id} className="border-b border-border/70 text-sm text-foreground">
+                        <td className="px-3 py-3 font-bold">{product.name}</td>
+                        <td className="px-3 py-3">{product.sellerName}</td>
+                        <td className="px-3 py-3">{product.category}</td>
+                        <td className="px-3 py-3">{statusLabel(product.status)}</td>
+                        <td className="px-3 py-3">{product.stock}</td>
+                        <td className="px-3 py-3">${product.price} MXN</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {filteredAdminProducts.length === 0 && (
+                <p className="mt-3 text-sm text-muted-foreground">
+                  No hay productos que coincidan con los filtros aplicados.
+                </p>
+              )}
+            </div>
           </>
         )}
 
@@ -564,6 +815,53 @@ export default function AdminPage() {
                 </div>
               </>
             )}
+
+            <div className="mb-6 border border-border bg-card p-4">
+              <h2 className="mb-4 font-display text-lg font-bold uppercase text-foreground">
+                Productos vendidos y envíos
+              </h2>
+
+              {loadingSales ? (
+                <p className="text-sm text-muted-foreground">Cargando ventas...</p>
+              ) : salesRows.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Aún no tienes ventas registradas.
+                </p>
+              ) : (
+                <div className="w-full overflow-x-auto">
+                  <table className="w-full min-w-[1100px] border-collapse">
+                    <thead>
+                      <tr className="border-b border-border text-left text-xs uppercase tracking-wider text-muted-foreground">
+                        <th className="px-3 py-2">Pedido</th>
+                        <th className="px-3 py-2">Fecha</th>
+                        <th className="px-3 py-2">Cliente</th>
+                        <th className="px-3 py-2">Email</th>
+                        <th className="px-3 py-2">Producto</th>
+                        <th className="px-3 py-2">Cantidad</th>
+                        <th className="px-3 py-2">Precio</th>
+                        <th className="px-3 py-2">Subtotal</th>
+                        <th className="px-3 py-2">Envío</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {salesRows.map((row, index) => (
+                        <tr key={`${row.orderId}-${row.productName}-${index}`} className="border-b border-border/70 text-sm text-foreground">
+                          <td className="px-3 py-3 font-bold">{row.orderId.slice(-8)}</td>
+                          <td className="px-3 py-3">{row.date}</td>
+                          <td className="px-3 py-3">{row.buyerName}</td>
+                          <td className="px-3 py-3">{row.buyerEmail}</td>
+                          <td className="px-3 py-3">{row.productName}</td>
+                          <td className="px-3 py-3">{row.quantity}</td>
+                          <td className="px-3 py-3">${row.unitPrice.toFixed(2)}</td>
+                          <td className="px-3 py-3">${row.subtotal.toFixed(2)}</td>
+                          <td className="px-3 py-3">{shippingStatusLabel(row.shippingStatus)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
 
             <div className="border border-border bg-card p-4">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -687,8 +985,8 @@ export default function AdminPage() {
         )}
 
         {isProductModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 px-4">
-            <div className="w-full max-w-2xl border border-border bg-card p-6">
+          <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-background/80 px-4 py-6">
+            <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto border border-border bg-card p-6">
               <div className="mb-4 flex items-center justify-between">
                 <h3 className="font-display text-xl font-bold uppercase text-foreground">
                   {editingProductId ? "Editar gorra" : "Nueva gorra"}
@@ -760,15 +1058,23 @@ export default function AdminPage() {
                   />
                 </div>
 
-                <input
+                <select
                   value={productForm.category}
                   onChange={(e) =>
-                    setProductForm((prev) => ({ ...prev, category: e.target.value }))
+                    setProductForm((prev) => ({
+                      ...prev,
+                      category: e.target.value as (typeof PRODUCT_CATEGORIES)[number],
+                    }))
                   }
                   className="w-full border border-border bg-background px-3 py-2 text-sm"
-                  placeholder="Categoría"
                   required
-                />
+                >
+                  {PRODUCT_CATEGORIES.map((category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
+                </select>
 
                 <div className="space-y-2">
                   <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
@@ -837,8 +1143,8 @@ export default function AdminPage() {
         )}
 
         {selectedProduct && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 px-4">
-            <div className="w-full max-w-3xl border border-border bg-card p-6">
+          <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-background/80 px-4 py-6">
+            <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto border border-border bg-card p-6">
               <div className="mb-4 flex items-center justify-between">
                 <h3 className="font-display text-xl font-bold uppercase text-foreground">
                   Detalle de gorra

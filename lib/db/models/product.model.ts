@@ -1,4 +1,5 @@
 import mongoose, { Schema, type Document } from "mongoose"
+import { PRODUCT_CATEGORIES, type ProductCategory } from "@/lib/constants/product-categories"
 
 export interface IProduct extends Document {
   sellerId: mongoose.Types.ObjectId
@@ -9,7 +10,7 @@ export interface IProduct extends Document {
   stock: number
   imageUrl: string
   imageUrls: string[]
-  category: string
+  category: ProductCategory
   isActive: boolean
   status: "active" | "paused" | "archived"
 }
@@ -34,7 +35,7 @@ const ProductSchema = new Schema<IProduct>({
       message: "Se requiere al menos 1 imagen y máximo 3",
     },
   },
-  category: { type: String, default: "General" },
+  category: { type: String, enum: PRODUCT_CATEGORIES, default: "Snapback" },
   isActive: { type: Boolean, default: true },
   status: {
     type: String,

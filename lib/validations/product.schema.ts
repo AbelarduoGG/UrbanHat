@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { PRODUCT_CATEGORIES } from "@/lib/constants/product-categories"
 
 export const createProductSchema = z.object({
   name: z.string().min(2, "El nombre debe tener al menos 2 caracteres"),
@@ -10,7 +11,7 @@ export const createProductSchema = z.object({
     .array(z.string().url("URL de imagen inválida"))
     .min(1, "Debes subir al menos 1 imagen")
     .max(3, "Máximo 3 imágenes por producto"),
-  category: z.string().default("General"),
+  category: z.enum(PRODUCT_CATEGORIES).default("Snapback"),
   status: z.enum(["active", "paused", "archived"]).optional(),
 })
 

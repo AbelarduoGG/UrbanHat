@@ -140,8 +140,21 @@ Lista productos activos.
 ### GET `/products?mine=true`
 Lista productos del vendedor autenticado.
 
+### GET `/products?all=true`
+Lista todos los productos (activos, pausados y archivados) para `superadmin`.
+
 ### POST `/products`
 Crea producto para el vendedor autenticado.
+
+`category` debe ser uno de:
+- `Snapback`
+- `Fitted`
+- `Trucker`
+- `Dad Hat`
+- `Flat Brim`
+- `5 Panels`
+- `Bucket Hat`
+- `Military`
 
 **Body**
 ```json
@@ -185,6 +198,12 @@ Sube imagen a Cloudinary desde archivo (`multipart/form-data`, campo `file`).
 ### POST `/orders`
 ### GET `/orders`
 
+### GET `/orders?scope=seller`
+Lista órdenes que incluyen productos del vendedor autenticado (con detalle de comprador y estado de envío).
+
+### GET `/orders?scope=admin`
+Lista todas las órdenes (solo `superadmin`).
+
 Autenticación aceptada (prioridad):
 1. Cookie de sesión web
 2. `Authorization: Bearer <jwt>`
@@ -192,7 +211,52 @@ Autenticación aceptada (prioridad):
 
 ---
 
-## 4) Endpoints administrativos
+## 4) Pagos (Stripe sandbox)
+
+### POST `/payments/create-checkout-session`
+Crea sesión de Stripe Checkout con los productos del carrito.
+
+**Body**
+```json
+{
+  "origin": "http://localhost:3000",
+  "items": [
+    { "productId": "65f...", "quantity": 2 }
+  ]
+}
+```
+
+### POST `/payments/confirm`
+Confirma pago con `sessionId` de Stripe y crea la orden final en BD.
+
+**Body**
+```json
+{
+  "sessionId": "cs_test_...",
+  "items": [
+    { "productId": "65f...", "quantity": 2 }
+  ],
+  "shipping": {
+    "nombre": "Juan",
+    "apellido": "Pérez",
+    "email": "juan@email.com",
+    "telefono": "5551234567",
+    "calle": "Av. Principal",
+    "numero": "123",
+    "colonia": "Centro",
+    "ciudad": "Monterrey",
+    "estado": "NL",
+    "codigoPostal": "64000"
+  }
+}
+```
+
+Variables requeridas en producción/sandbox:
+- `STRIPE_KEY` (compatibilidad también con `STRIPE_SECRET_KEY`)
+
+---
+
+## 5) Endpoints administrativos
 
 ### POST `/admin/seed-superadmin`
 Crea superadmin único (si no existe).
@@ -227,7 +291,7 @@ Cambia contraseña del usuario autenticado (incluido superadmin).
 
 ---
 
-## 5) Flujo recomendado
+## 6) Flujo recomendado
 
 ### Cliente comprador (PWA)
 - Login -> guardar `token`

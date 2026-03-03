@@ -1,6 +1,6 @@
 "use client"
 
-import React from "react"
+import React, { Suspense } from "react"
 
 import { useState } from "react"
 import Image from "next/image"
@@ -9,7 +9,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { Eye, EyeOff, LogIn, ArrowRight } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 
-export default function LoginPage() {
+function LoginPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { login } = useAuth()
@@ -195,5 +195,13 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">Cargando...</div>}>
+      <LoginPageContent />
+    </Suspense>
   )
 }

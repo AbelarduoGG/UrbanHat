@@ -47,3 +47,8 @@
 - Proveedor recomendado para MVP: **Stripe test mode**.
 - Imágenes de productos se manejan como URL.
 - Evitar features fuera de alcance académico/MVP.
+
+## 6) Política operativa marketplace
+
+- Ver lineamientos de operación, confianza, comisiones (14%), retenciones y envíos en:
+  - `docs/08-marketplace-operacion-y-confianza.md`

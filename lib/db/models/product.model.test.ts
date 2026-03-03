@@ -13,7 +13,7 @@ describe("Product model", () => {
 
     await expect(product.validate()).resolves.toBeUndefined()
     expect(product.brand).toBe("Sin marca")
-    expect(product.category).toBe("General")
+    expect(product.category).toBe("Snapback")
     expect(product.isActive).toBe(true)
     expect(product.status).toBe("active")
     expect(product.imageUrls).toEqual(["https://cdn/img-1.png"])

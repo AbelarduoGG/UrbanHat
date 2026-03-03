@@ -1,6 +1,12 @@
 "use client"
 
-import { createContext, useContext, useState, type ReactNode } from "react"
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react"
 
 export interface CartItem {
   id: string
@@ -27,6 +33,31 @@ const CartContext = createContext<CartContextType | undefined>(undefined)
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([])
   const [isCartOpen, setIsCartOpen] = useState(false)
+  const [isHydrated, setIsHydrated] = useState(false)
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("urbanhat_cart")
+      if (!raw) {
+        setIsHydrated(true)
+        return
+      }
+
+      const parsed = JSON.parse(raw) as CartItem[]
+      if (Array.isArray(parsed)) {
+        setItems(parsed)
+      }
+    } catch {
+      setItems([])
+    } finally {
+      setIsHydrated(true)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!isHydrated) return
+    localStorage.setItem("urbanhat_cart", JSON.stringify(items))
+  }, [items, isHydrated])
 
   const addToCart = (item: Omit<CartItem, "quantity">) => {
     setItems((prev) => {
