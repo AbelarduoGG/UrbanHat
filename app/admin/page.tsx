@@ -11,6 +11,7 @@ import {
   Loader2,
   LogOut,
   Pause,
+  Plus,
   Play,
   Save,
   Upload,
@@ -27,6 +28,7 @@ import {
   YAxis,
 } from "recharts"
 import { useAuth } from "@/lib/auth-context"
+import { PRODUCT_CATEGORIES } from "@/lib/constants/product-categories"
 
 type Role = "superadmin" | "seller" | "buyer"
 type ProductStatus = "active" | "paused" | "archived"
@@ -82,6 +84,40 @@ interface DashboardMetrics {
   tasaComision: number
 }
 
+interface OrderItemDto {
+  productId: string
+  sellerId: string
+  name: string
+  quantity: number
+  priceAtPurchase: number
+}
+
+interface OrderDto {
+  _id: string
+  buyerId?: {
+    _id?: string
+    name?: string
+    email?: string
+  }
+  items: OrderItemDto[]
+  totalAmount: number
+  status: string
+  shippingStatus?: "seller_received" | "preparing" | "shipped" | "delivered"
+  createdAt: string
+}
+
+interface SellerSaleRow {
+  orderId: string
+  date: string
+  buyerName: string
+  buyerEmail: string
+  productName: string
+  quantity: number
+  unitPrice: number
+  subtotal: number
+  shippingStatus: string
+}
+
 interface ProductForm {
   name: string
   brand: string
@@ -89,7 +125,7 @@ interface ProductForm {
   price: number
   stock: number
   imageUrls: string[]
-  category: string
+  category: (typeof PRODUCT_CATEGORIES)[number]
 }
 
 const emptyProduct: ProductForm = {
@@ -99,7 +135,7 @@ const emptyProduct: ProductForm = {
   price: 0,
   stock: 0,
   imageUrls: ["", "", ""],
-  category: "General",
+  category: "Snapback",
 }
 
 function roleLabel(role: Role) {
@@ -114,6 +150,20 @@ function statusLabel(status: ProductStatus) {
   return "Archivado"
 }
 
+function shippingStatusLabel(status?: string) {
+  if (status === "seller_received") return "Pendiente de envío"
+  if (status === "preparing") return "Preparando"
+  if (status === "shipped") return "Enviado"
+  if (status === "delivered") return "Entregado"
+  return "Pendiente"
+}
+
+function normalizeProductCategory(value: string): (typeof PRODUCT_CATEGORIES)[number] {
+  return PRODUCT_CATEGORIES.includes(value as (typeof PRODUCT_CATEGORIES)[number])
+    ? (value as (typeof PRODUCT_CATEGORIES)[number])
+    : "Snapback"
+}
+
 export default function AdminPage() {
   const router = useRouter()
   const { logout } = useAuth()
@@ -125,9 +175,19 @@ export default function AdminPage() {
   const [products, setProducts] = useState<SellerProduct[]>([])
   const [productForm, setProductForm] = useState<ProductForm>(emptyProduct)
   const [editingProductId, setEditingProductId] = useState<string | null>(null)
+  const [isProductModalOpen, setIsProductModalOpen] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState<SellerProduct | null>(null)
   const [uploadingIndex, setUploadingIndex] = useState<number | null>(null)
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null)
+  const [salesRows, setSalesRows] = useState<SellerSaleRow[]>([])
+  const [loadingSales, setLoadingSales] = useState(false)
+  const [adminProducts, setAdminProducts] = useState<SellerProduct[]>([])
+  const [adminFilters, setAdminFilters] = useState({
+    sellerId: "all",
+    category: "all",
+    minPrice: "",
+    maxPrice: "",
+  })
 
   const title = useMemo(() => {
     if (me?.role === "superadmin") return "Panel de administración"
@@ -169,13 +229,28 @@ export default function AdminPage() {
 
     if (me.role === "superadmin") {
       refreshUsers()
+      refreshAdminProducts()
       return
     }
 
     if (me.role === "seller") {
       refreshMyProducts()
+      refreshSellerSales()
     }
   }, [me])
+
+  useEffect(() => {
+    const hasOpenModal = isProductModalOpen || Boolean(selectedProduct)
+
+    if (!hasOpenModal) return
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [isProductModalOpen, selectedProduct])
 
   const refreshMetrics = async () => {
     const response = await fetch("/api/v1/admin/metrics")
@@ -198,6 +273,59 @@ export default function AdminPage() {
     const payload = (await response.json()) as ApiResponse<SellerProduct[]>
     if (response.ok && payload.success && payload.data) {
       setProducts(payload.data)
+    }
+  }
+
+  const refreshAdminProducts = async () => {
+    const response = await fetch("/api/v1/products?all=true")
+    const payload = (await response.json()) as ApiResponse<SellerProduct[]>
+
+    if (response.ok && payload.success && payload.data) {
+      setAdminProducts(payload.data)
+    }
+  }
+
+  const refreshSellerSales = async () => {
+    try {
+      setLoadingSales(true)
+
+      const response = await fetch("/api/v1/orders?scope=seller")
+      const payload = (await response.json()) as ApiResponse<OrderDto[]>
+
+      if (!response.ok || !payload.success || !payload.data) {
+        setSalesRows([])
+        return
+      }
+
+      const rows: SellerSaleRow[] = []
+
+      for (const order of payload.data) {
+        const sellerItems = (order.items || []).filter(
+          (item) => String(item.sellerId) === String(me?.id)
+        )
+
+        for (const item of sellerItems) {
+          rows.push({
+            orderId: order._id,
+            date: new Date(order.createdAt).toLocaleDateString("es-MX", {
+              year: "numeric",
+              month: "short",
+              day: "numeric",
+            }),
+            buyerName: order.buyerId?.name || "Cliente",
+            buyerEmail: order.buyerId?.email || "-",
+            productName: item.name,
+            quantity: item.quantity,
+            unitPrice: Number(item.priceAtPurchase || 0),
+            subtotal: Number(item.priceAtPurchase || 0) * Number(item.quantity || 0),
+            shippingStatus: order.shippingStatus || "seller_received",
+          })
+        }
+      }
+
+      setSalesRows(rows)
+    } finally {
+      setLoadingSales(false)
     }
   }
 
@@ -263,6 +391,36 @@ export default function AdminPage() {
     }
   }
 
+  const closeProductModal = () => {
+    setIsProductModalOpen(false)
+    setEditingProductId(null)
+    setProductForm(emptyProduct)
+  }
+
+  const openCreateProductModal = () => {
+    setEditingProductId(null)
+    setProductForm(emptyProduct)
+    setIsProductModalOpen(true)
+  }
+
+  const openEditProductModal = (product: SellerProduct) => {
+    setEditingProductId(product.id)
+    setProductForm({
+      name: product.name,
+      brand: product.brand,
+      description: product.description,
+      price: product.price,
+      stock: product.stock,
+      imageUrls: [
+        product.imageUrls[0] || "",
+        product.imageUrls[1] || "",
+        product.imageUrls[2] || "",
+      ],
+      category: normalizeProductCategory(product.category),
+    })
+    setIsProductModalOpen(true)
+  }
+
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault()
     setMessage("")
@@ -273,32 +431,35 @@ export default function AdminPage() {
       return
     }
 
-    const endpoint = editingProductId
-      ? `/api/v1/products/${editingProductId}`
-      : "/api/v1/products"
+    try {
+      const endpoint = editingProductId
+        ? `/api/v1/products/${editingProductId}`
+        : "/api/v1/products"
 
-    const method = editingProductId ? "PATCH" : "POST"
+      const method = editingProductId ? "PATCH" : "POST"
 
-    const response = await fetch(endpoint, {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...productForm,
-        imageUrls: validImages,
-      }),
-    })
+      const response = await fetch(endpoint, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...productForm,
+          imageUrls: validImages,
+        }),
+      })
 
-    const payload = (await response.json()) as ApiResponse
-    if (!response.ok || !payload.success) {
-      setMessage(payload.error || "No se pudo guardar la gorra")
-      return
+      const payload = (await response.json()) as ApiResponse
+      if (!response.ok || !payload.success) {
+        setMessage(payload.error || "No se pudo guardar la gorra")
+        return
+      }
+
+      setMessage(editingProductId ? "Gorra actualizada" : "Gorra creada")
+      closeProductModal()
+      await refreshMyProducts()
+      await refreshMetrics()
+    } catch {
+      setMessage("No se pudo guardar la gorra")
     }
-
-    setProductForm(emptyProduct)
-    setEditingProductId(null)
-    setMessage(editingProductId ? "Gorra actualizada" : "Gorra creada")
-    await refreshMyProducts()
-    await refreshMetrics()
   }
 
   const updateProductStatus = async (productId: string, status: ProductStatus) => {
@@ -320,14 +481,6 @@ export default function AdminPage() {
     await refreshMetrics()
   }
 
-  if (isLoading || !me) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background text-muted-foreground">
-        Cargando panel...
-      </div>
-    )
-  }
-
   const adminChartData = metrics
     ? [
         { name: "Usuarios", valor: metrics.totalUsuarios || 0 },
@@ -346,9 +499,45 @@ export default function AdminPage() {
       ]
     : []
 
+  const adminSellerOptions = useMemo(() => {
+    const map = new Map<string, string>()
+
+    for (const product of adminProducts) {
+      if (product.sellerId && product.sellerName) {
+        map.set(product.sellerId, product.sellerName)
+      }
+    }
+
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }))
+  }, [adminProducts])
+
+  const filteredAdminProducts = useMemo(() => {
+    const min = adminFilters.minPrice ? Number(adminFilters.minPrice) : null
+    const max = adminFilters.maxPrice ? Number(adminFilters.maxPrice) : null
+
+    return adminProducts.filter((product) => {
+      const matchesSeller =
+        adminFilters.sellerId === "all" || product.sellerId === adminFilters.sellerId
+      const matchesCategory =
+        adminFilters.category === "all" || product.category === adminFilters.category
+      const matchesMin = min === null || product.price >= min
+      const matchesMax = max === null || product.price <= max
+
+      return matchesSeller && matchesCategory && matchesMin && matchesMax
+    })
+  }, [adminProducts, adminFilters])
+
+  if (isLoading || !me) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background text-muted-foreground">
+        Cargando panel...
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-background px-4 py-8 lg:px-8">
-      <div className="mx-auto max-w-6xl">
+      <div className="mx-auto max-w-7xl">
         <div className="mb-8 flex items-center justify-between border border-border bg-card p-4">
           <div>
             <h1 className="font-display text-2xl font-bold uppercase tracking-wider text-foreground">
@@ -435,7 +624,7 @@ export default function AdminPage() {
                 Usuarios del sistema
               </h2>
               <p className="mb-4 text-xs text-muted-foreground">
-                El registro de vendedores es público desde "Registro Vendedor"; aquí solo gestionas activación y roles.
+                El registro de vendedores es público desde &quot;Registro Vendedor&quot;; aquí solo gestionas activación y roles.
               </p>
               <div className="space-y-3">
                 {users.map((user) => {
@@ -487,6 +676,99 @@ export default function AdminPage() {
                 })}
               </div>
             </div>
+
+            <div className="mt-6 border border-border bg-card p-4">
+              <h2 className="mb-4 font-display text-lg font-bold uppercase text-foreground">
+                Productos del marketplace
+              </h2>
+
+              <div className="mb-4 grid gap-3 md:grid-cols-4">
+                <select
+                  value={adminFilters.sellerId}
+                  onChange={(e) =>
+                    setAdminFilters((prev) => ({ ...prev, sellerId: e.target.value }))
+                  }
+                  className="w-full border border-border bg-background px-3 py-2 text-xs uppercase tracking-wider"
+                >
+                  <option value="all">Todos los vendedores</option>
+                  {adminSellerOptions.map((seller) => (
+                    <option key={seller.id} value={seller.id}>
+                      {seller.name}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={adminFilters.category}
+                  onChange={(e) =>
+                    setAdminFilters((prev) => ({ ...prev, category: e.target.value }))
+                  }
+                  className="w-full border border-border bg-background px-3 py-2 text-xs uppercase tracking-wider"
+                >
+                  <option value="all">Todas las categorías</option>
+                  {PRODUCT_CATEGORIES.map((category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
+                </select>
+
+                <input
+                  type="number"
+                  min={0}
+                  value={adminFilters.minPrice}
+                  onChange={(e) =>
+                    setAdminFilters((prev) => ({ ...prev, minPrice: e.target.value }))
+                  }
+                  placeholder="Precio mínimo"
+                  className="w-full border border-border bg-background px-3 py-2 text-xs uppercase tracking-wider"
+                />
+
+                <input
+                  type="number"
+                  min={0}
+                  value={adminFilters.maxPrice}
+                  onChange={(e) =>
+                    setAdminFilters((prev) => ({ ...prev, maxPrice: e.target.value }))
+                  }
+                  placeholder="Precio máximo"
+                  className="w-full border border-border bg-background px-3 py-2 text-xs uppercase tracking-wider"
+                />
+              </div>
+
+              <div className="w-full overflow-x-auto">
+                <table className="w-full min-w-[980px] border-collapse">
+                  <thead>
+                    <tr className="border-b border-border text-left text-xs uppercase tracking-wider text-muted-foreground">
+                      <th className="px-3 py-2">Producto</th>
+                      <th className="px-3 py-2">Vendedor</th>
+                      <th className="px-3 py-2">Categoría</th>
+                      <th className="px-3 py-2">Estado</th>
+                      <th className="px-3 py-2">Stock</th>
+                      <th className="px-3 py-2">Precio</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredAdminProducts.map((product) => (
+                      <tr key={product.id} className="border-b border-border/70 text-sm text-foreground">
+                        <td className="px-3 py-3 font-bold">{product.name}</td>
+                        <td className="px-3 py-3">{product.sellerName}</td>
+                        <td className="px-3 py-3">{product.category}</td>
+                        <td className="px-3 py-3">{statusLabel(product.status)}</td>
+                        <td className="px-3 py-3">{product.stock}</td>
+                        <td className="px-3 py-3">${product.price} MXN</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {filteredAdminProducts.length === 0 && (
+                <p className="mt-3 text-sm text-muted-foreground">
+                  No hay productos que coincidan con los filtros aplicados.
+                </p>
+              )}
+            </div>
           </>
         )}
 
@@ -534,46 +816,223 @@ export default function AdminPage() {
               </>
             )}
 
-            <div className="grid gap-6 lg:grid-cols-3">
-              <form
-                onSubmit={handleSaveProduct}
-                className="border border-border bg-card p-4 lg:col-span-1"
-              >
-                <h2 className="mb-4 font-display text-lg font-bold uppercase text-foreground">
-                  {editingProductId ? "Editar gorra" : "Nueva gorra"}
+            <div className="mb-6 border border-border bg-card p-4">
+              <h2 className="mb-4 font-display text-lg font-bold uppercase text-foreground">
+                Productos vendidos y envíos
+              </h2>
+
+              {loadingSales ? (
+                <p className="text-sm text-muted-foreground">Cargando ventas...</p>
+              ) : salesRows.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Aún no tienes ventas registradas.
+                </p>
+              ) : (
+                <div className="w-full overflow-x-auto">
+                  <table className="w-full min-w-[1100px] border-collapse">
+                    <thead>
+                      <tr className="border-b border-border text-left text-xs uppercase tracking-wider text-muted-foreground">
+                        <th className="px-3 py-2">Pedido</th>
+                        <th className="px-3 py-2">Fecha</th>
+                        <th className="px-3 py-2">Cliente</th>
+                        <th className="px-3 py-2">Email</th>
+                        <th className="px-3 py-2">Producto</th>
+                        <th className="px-3 py-2">Cantidad</th>
+                        <th className="px-3 py-2">Precio</th>
+                        <th className="px-3 py-2">Subtotal</th>
+                        <th className="px-3 py-2">Envío</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {salesRows.map((row, index) => (
+                        <tr key={`${row.orderId}-${row.productName}-${index}`} className="border-b border-border/70 text-sm text-foreground">
+                          <td className="px-3 py-3 font-bold">{row.orderId.slice(-8)}</td>
+                          <td className="px-3 py-3">{row.date}</td>
+                          <td className="px-3 py-3">{row.buyerName}</td>
+                          <td className="px-3 py-3">{row.buyerEmail}</td>
+                          <td className="px-3 py-3">{row.productName}</td>
+                          <td className="px-3 py-3">{row.quantity}</td>
+                          <td className="px-3 py-3">${row.unitPrice.toFixed(2)}</td>
+                          <td className="px-3 py-3">${row.subtotal.toFixed(2)}</td>
+                          <td className="px-3 py-3">{shippingStatusLabel(row.shippingStatus)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div className="border border-border bg-card p-4">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <h2 className="font-display text-lg font-bold uppercase text-foreground">
+                  Mis gorras
                 </h2>
+                <button
+                  type="button"
+                  onClick={openCreateProductModal}
+                  className="inline-flex items-center gap-2 bg-accent px-4 py-2 text-xs font-bold uppercase tracking-wider text-accent-foreground"
+                >
+                  <Plus className="h-4 w-4" />
+                  Agregar producto
+                </button>
+              </div>
 
-                <div className="space-y-3">
-                  <input
-                    value={productForm.name}
-                    onChange={(e) =>
-                      setProductForm((prev) => ({ ...prev, name: e.target.value }))
-                    }
-                    className="w-full border border-border bg-background px-3 py-2 text-sm"
-                    placeholder="Nombre"
-                    required
-                  />
+              {products.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  Aún no tienes productos. Crea tu primera gorra para publicarla en la tienda.
+                </p>
+              )}
 
-                  <input
-                    value={productForm.brand}
-                    onChange={(e) =>
-                      setProductForm((prev) => ({ ...prev, brand: e.target.value }))
-                    }
-                    className="w-full border border-border bg-background px-3 py-2 text-sm"
-                    placeholder="Marca"
-                    required
-                  />
+              <div className="w-full overflow-x-auto">
+                <table className="w-full min-w-[980px] border-collapse">
+                  <thead>
+                    <tr className="border-b border-border text-left text-xs uppercase tracking-wider text-muted-foreground">
+                      <th className="px-3 py-2">Producto</th>
+                      <th className="px-3 py-2">Marca</th>
+                      <th className="px-3 py-2">Categoría</th>
+                      <th className="px-3 py-2">Estado</th>
+                      <th className="px-3 py-2">Stock</th>
+                      <th className="px-3 py-2">Precio</th>
+                      <th className="px-3 py-2 text-right">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {products.map((product) => (
+                      <tr key={product.id} className="border-b border-border/70 text-sm text-foreground">
+                        <td className="px-3 py-3 font-bold">{product.name}</td>
+                        <td className="px-3 py-3">{product.brand}</td>
+                        <td className="px-3 py-3">{product.category}</td>
+                        <td className="px-3 py-3">{statusLabel(product.status)}</td>
+                        <td className="px-3 py-3">{product.stock}</td>
+                        <td className="px-3 py-3">${product.price} MXN</td>
+                        <td className="px-3 py-3">
+                          <div className="flex flex-wrap justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedProduct(product)}
+                              className="border border-border px-3 py-1 text-xs font-bold uppercase"
+                            >
+                              <span className="inline-flex items-center gap-1">
+                                <Eye className="h-3 w-3" />
+                                Ver
+                              </span>
+                            </button>
 
-                  <textarea
-                    value={productForm.description}
-                    onChange={(e) =>
-                      setProductForm((prev) => ({ ...prev, description: e.target.value }))
-                    }
-                    className="w-full border border-border bg-background px-3 py-2 text-sm"
-                    placeholder="Descripción"
-                    rows={3}
-                  />
+                            <button
+                              type="button"
+                              onClick={() => openEditProductModal(product)}
+                              className="border border-border px-3 py-1 text-xs font-bold uppercase"
+                            >
+                              Editar
+                            </button>
 
+                            {product.status !== "paused" && (
+                              <button
+                                type="button"
+                                onClick={() => updateProductStatus(product.id, "paused")}
+                                className="border border-border px-3 py-1 text-xs font-bold uppercase"
+                              >
+                                <span className="inline-flex items-center gap-1">
+                                  <Pause className="h-3 w-3" />
+                                  Pausar
+                                </span>
+                              </button>
+                            )}
+
+                            {product.status !== "active" && (
+                              <button
+                                type="button"
+                                onClick={() => updateProductStatus(product.id, "active")}
+                                className="border border-border px-3 py-1 text-xs font-bold uppercase"
+                              >
+                                <span className="inline-flex items-center gap-1">
+                                  <Play className="h-3 w-3" />
+                                  Activar
+                                </span>
+                              </button>
+                            )}
+
+                            {product.status !== "archived" && (
+                              <button
+                                type="button"
+                                onClick={() => updateProductStatus(product.id, "archived")}
+                                className="flex items-center gap-1 bg-destructive px-3 py-1 text-xs font-bold uppercase text-destructive-foreground"
+                              >
+                                <Archive className="h-3 w-3" />
+                                Archivar
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="mt-4 border-t border-border pt-4">
+                <Link
+                  href="/"
+                  className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground"
+                >
+                  <Upload className="h-3 w-3" />
+                  Ver mis productos en la tienda
+                </Link>
+              </div>
+            </div>
+          </>
+        )}
+
+        {isProductModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-background/80 px-4 py-6">
+            <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto border border-border bg-card p-6">
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="font-display text-xl font-bold uppercase text-foreground">
+                  {editingProductId ? "Editar gorra" : "Nueva gorra"}
+                </h3>
+                <button
+                  type="button"
+                  onClick={closeProductModal}
+                  className="text-muted-foreground hover:text-foreground"
+                  aria-label="Cerrar"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveProduct} className="space-y-3">
+                <input
+                  value={productForm.name}
+                  onChange={(e) =>
+                    setProductForm((prev) => ({ ...prev, name: e.target.value }))
+                  }
+                  className="w-full border border-border bg-background px-3 py-2 text-sm"
+                  placeholder="Nombre"
+                  required
+                />
+
+                <input
+                  value={productForm.brand}
+                  onChange={(e) =>
+                    setProductForm((prev) => ({ ...prev, brand: e.target.value }))
+                  }
+                  className="w-full border border-border bg-background px-3 py-2 text-sm"
+                  placeholder="Marca"
+                  required
+                />
+
+                <textarea
+                  value={productForm.description}
+                  onChange={(e) =>
+                    setProductForm((prev) => ({ ...prev, description: e.target.value }))
+                  }
+                  className="w-full border border-border bg-background px-3 py-2 text-sm"
+                  placeholder="Descripción"
+                  rows={3}
+                />
+
+                <div className="grid gap-3 md:grid-cols-2">
                   <input
                     type="number"
                     value={productForm.price}
@@ -597,70 +1056,78 @@ export default function AdminPage() {
                     min={0}
                     required
                   />
+                </div>
 
-                  <input
-                    value={productForm.category}
-                    onChange={(e) =>
-                      setProductForm((prev) => ({ ...prev, category: e.target.value }))
-                    }
-                    className="w-full border border-border bg-background px-3 py-2 text-sm"
-                    placeholder="Categoría"
-                    required
-                  />
+                <select
+                  value={productForm.category}
+                  onChange={(e) =>
+                    setProductForm((prev) => ({
+                      ...prev,
+                      category: e.target.value as (typeof PRODUCT_CATEGORIES)[number],
+                    }))
+                  }
+                  className="w-full border border-border bg-background px-3 py-2 text-sm"
+                  required
+                >
+                  {PRODUCT_CATEGORIES.map((category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
+                </select>
 
-                  <div className="space-y-2">
-                    <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                      Imágenes del producto (máximo 3)
-                    </p>
+                <div className="space-y-2">
+                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Imágenes del producto (máximo 3)
+                  </p>
 
-                    {[0, 1, 2].map((index) => (
-                      <div key={index} className="border border-border p-2">
-                        <label className="mb-2 block text-xs text-muted-foreground">
-                          Imagen {index + 1}
-                        </label>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="mb-2 block w-full text-xs text-muted-foreground"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0]
-                            if (file) {
-                              uploadImage(file, index)
-                            }
-                          }}
-                        />
+                  {[0, 1, 2].map((index) => (
+                    <div key={index} className="border border-border p-2">
+                      <label className="mb-2 block text-xs text-muted-foreground">
+                        Imagen {index + 1}
+                      </label>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="mb-2 block w-full text-xs text-muted-foreground"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0]
+                          if (file) {
+                            uploadImage(file, index)
+                          }
+                        }}
+                      />
 
-                        {uploadingIndex === index && (
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                            Subiendo imagen...
+                      {uploadingIndex === index && (
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          Subiendo imagen...
+                        </div>
+                      )}
+
+                      {productForm.imageUrls[index] && (
+                        <div className="space-y-2">
+                          <Image
+                            src={productForm.imageUrls[index]}
+                            alt={`Vista previa ${index + 1}`}
+                            width={320}
+                            height={180}
+                            className="h-28 w-full object-cover"
+                          />
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="truncate text-xs text-foreground">Imagen cargada</p>
+                            <button
+                              type="button"
+                              onClick={() => setImageAtIndex(index, "")}
+                              className="text-xs font-medium text-destructive"
+                            >
+                              Quitar
+                            </button>
                           </div>
-                        )}
-
-                        {productForm.imageUrls[index] && (
-                          <div className="space-y-2">
-                            <Image
-                              src={productForm.imageUrls[index]}
-                              alt={`Vista previa ${index + 1}`}
-                              width={320}
-                              height={180}
-                              className="h-28 w-full object-cover"
-                            />
-                            <div className="flex items-center justify-between gap-2">
-                              <p className="truncate text-xs text-foreground">Imagen cargada</p>
-                              <button
-                                type="button"
-                                onClick={() => setImageAtIndex(index, "")}
-                                className="text-xs font-medium text-destructive"
-                              >
-                                Quitar
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
 
                 <button
@@ -671,124 +1138,13 @@ export default function AdminPage() {
                   {editingProductId ? "Guardar cambios" : "Crear gorra"}
                 </button>
               </form>
-
-              <div className="border border-border bg-card p-4 lg:col-span-2">
-                <h2 className="mb-4 font-display text-lg font-bold uppercase text-foreground">
-                  Mis gorras
-                </h2>
-
-                {products.length === 0 && (
-                  <p className="text-sm text-muted-foreground">
-                    Aún no tienes productos. Crea tu primera gorra para publicarla en la tienda.
-                  </p>
-                )}
-
-                <div className="space-y-3">
-                  {products.map((product) => (
-                    <div
-                      key={product.id}
-                      className="flex flex-col gap-2 border border-border p-3 md:flex-row md:items-center md:justify-between"
-                    >
-                      <div>
-                        <p className="text-sm font-bold text-foreground">{product.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {product.brand} • {product.category} • {statusLabel(product.status)} • Stock: {product.stock} • ${product.price} MXN
-                        </p>
-                      </div>
-
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedProduct(product)}
-                          className="border border-border px-3 py-1 text-xs font-bold uppercase"
-                        >
-                          <span className="inline-flex items-center gap-1">
-                            <Eye className="h-3 w-3" />
-                            Ver
-                          </span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingProductId(product.id)
-                            setProductForm({
-                              name: product.name,
-                              brand: product.brand,
-                              description: product.description,
-                              price: product.price,
-                              stock: product.stock,
-                              imageUrls: [
-                                product.imageUrls[0] || "",
-                                product.imageUrls[1] || "",
-                                product.imageUrls[2] || "",
-                              ],
-                              category: product.category,
-                            })
-                          }}
-                          className="border border-border px-3 py-1 text-xs font-bold uppercase"
-                        >
-                          Editar
-                        </button>
-
-                        {product.status !== "paused" && (
-                          <button
-                            type="button"
-                            onClick={() => updateProductStatus(product.id, "paused")}
-                            className="border border-border px-3 py-1 text-xs font-bold uppercase"
-                          >
-                            <span className="inline-flex items-center gap-1">
-                              <Pause className="h-3 w-3" />
-                              Pausar
-                            </span>
-                          </button>
-                        )}
-
-                        {product.status !== "active" && (
-                          <button
-                            type="button"
-                            onClick={() => updateProductStatus(product.id, "active")}
-                            className="border border-border px-3 py-1 text-xs font-bold uppercase"
-                          >
-                            <span className="inline-flex items-center gap-1">
-                              <Play className="h-3 w-3" />
-                              Activar
-                            </span>
-                          </button>
-                        )}
-
-                        {product.status !== "archived" && (
-                          <button
-                            type="button"
-                            onClick={() => updateProductStatus(product.id, "archived")}
-                            className="flex items-center gap-1 bg-destructive px-3 py-1 text-xs font-bold uppercase text-destructive-foreground"
-                          >
-                            <Archive className="h-3 w-3" />
-                            Archivar
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mt-4 border-t border-border pt-4">
-                  <Link
-                    href="/"
-                    className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground"
-                  >
-                    <Upload className="h-3 w-3" />
-                    Ver mis productos en la tienda
-                  </Link>
-                </div>
-              </div>
             </div>
-          </>
+          </div>
         )}
 
         {selectedProduct && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 px-4">
-            <div className="w-full max-w-3xl border border-border bg-card p-6">
+          <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-background/80 px-4 py-6">
+            <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto border border-border bg-card p-6">
               <div className="mb-4 flex items-center justify-between">
                 <h3 className="font-display text-xl font-bold uppercase text-foreground">
                   Detalle de gorra

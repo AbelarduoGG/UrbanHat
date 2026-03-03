@@ -1,4 +1,5 @@
 import React from "react"
+import { AuthProvider } from "@/lib/auth-context"
 import { CartProvider } from "@/lib/cart-context"
 
 export default function CheckoutLayout({
@@ -6,5 +7,9 @@ export default function CheckoutLayout({
 }: {
   children: React.ReactNode
 }) {
-  return <CartProvider>{children}</CartProvider>
+  return (
+    <AuthProvider>
+      <CartProvider>{children}</CartProvider>
+    </AuthProvider>
+  )
 }

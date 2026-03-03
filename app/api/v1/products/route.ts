@@ -23,6 +23,7 @@ export async function GET(_req: NextRequest) {
   try {
     const auth = getRequestAuth(_req)
     const sellerOnly = _req.nextUrl.searchParams.get("mine") === "true"
+    const allProducts = _req.nextUrl.searchParams.get("all") === "true"
 
     if (sellerOnly) {
       if (!auth) {
@@ -40,9 +41,25 @@ export async function GET(_req: NextRequest) {
       }
     }
 
+    if (allProducts) {
+      if (!auth) {
+        return NextResponse.json<ApiResponse>(
+          { success: false, error: "Se requiere autenticación" },
+          { status: 401 }
+        )
+      }
+
+      if (auth.role !== "superadmin") {
+        return NextResponse.json<ApiResponse>(
+          { success: false, error: "Solo administradores pueden consultar todos los productos" },
+          { status: 403 }
+        )
+      }
+    }
+
     const products = sellerOnly
       ? await getProductsBySeller(auth!.userId)
-      : await getAllProducts()
+      : await getAllProducts(!allProducts)
 
     const data: ProductPublic[] = products.map((p) => ({
       id: p._id.toString(),

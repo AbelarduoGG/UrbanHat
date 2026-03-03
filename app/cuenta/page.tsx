@@ -17,17 +17,72 @@ import {
   ShoppingBag,
   Clock,
   CheckCircle2,
+  Eye,
+  EyeOff,
 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 
 type Tab = "perfil" | "pedidos" | "direccion" | "seguridad"
+
+function splitComposedAddress(direccion?: string) {
+  const raw = (direccion || "").trim()
+  if (!raw) {
+    return { calle: "", numero: "", colonia: "" }
+  }
+
+  const [streetAndNumberPart, coloniaPart = ""] = raw.split(",").map((part) => part.trim())
+
+  if (!streetAndNumberPart) {
+    return { calle: "", numero: "", colonia: coloniaPart }
+  }
+
+  const match = streetAndNumberPart.match(/^(.*\S)\s+([^\s]+)$/)
+
+  if (!match) {
+    return {
+      calle: streetAndNumberPart,
+      numero: "",
+      colonia: coloniaPart,
+    }
+  }
+
+  return {
+    calle: match[1] || "",
+    numero: match[2] || "",
+    colonia: coloniaPart,
+  }
+}
 
 interface Order {
   id: string
   date: string
   total: number
   status: string
+  shippingStatus?: string
   items: number
+}
+
+interface ApiOrder {
+  _id: string
+  totalAmount: number
+  status: string
+  shippingStatus?: string
+  createdAt: string
+  items: Array<{ quantity: number }>
+}
+
+interface ApiResponse<T = unknown> {
+  success: boolean
+  data?: T
+  error?: string
+}
+
+function shippingStatusLabel(status?: string) {
+  if (status === "seller_received") return "Pendiente de envío"
+  if (status === "preparing") return "Preparando"
+  if (status === "shipped") return "Enviado"
+  if (status === "delivered") return "Entregado"
+  return "Pendiente"
 }
 
 export default function AccountPage() {
@@ -35,7 +90,8 @@ export default function AccountPage() {
   const { user, isLoading, logout, updateProfile } = useAuth()
   const [activeTab, setActiveTab] = useState<Tab>("perfil")
   const [saved, setSaved] = useState(false)
-  const [orders] = useState<Order[]>([])
+  const [orders, setOrders] = useState<Order[]>([])
+  const [ordersLoading, setOrdersLoading] = useState(false)
 
   const [profileData, setProfileData] = useState({
     nombre: "",
@@ -45,7 +101,9 @@ export default function AccountPage() {
   })
 
   const [addressData, setAddressData] = useState({
-    direccion: "",
+    calle: "",
+    numero: "",
+    colonia: "",
     ciudad: "",
     estado: "",
     codigoPostal: "",
@@ -61,12 +119,19 @@ export default function AccountPage() {
     nueva: "",
     confirmar: "",
   })
+  const [showPassword, setShowPassword] = useState({
+    actual: false,
+    nueva: false,
+    confirmar: false,
+  })
 
   useEffect(() => {
     if (!isLoading && !user) {
       router.push("/login")
     }
     if (user) {
+      const parsedAddress = splitComposedAddress(user.direccion)
+
       setProfileData({
         nombre: user.nombre || "",
         apellido: user.apellido || "",
@@ -74,13 +139,98 @@ export default function AccountPage() {
         telefono: user.telefono || "",
       })
       setAddressData({
-        direccion: user.direccion || "",
+        calle: parsedAddress.calle,
+        numero: parsedAddress.numero,
+        colonia: parsedAddress.colonia,
         ciudad: user.ciudad || "",
         estado: user.estado || "",
         codigoPostal: user.codigoPostal || "",
       })
+
+      void (async () => {
+        try {
+          const response = await fetch("/api/v1/auth/me", {
+            method: "GET",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+          })
+
+          if (!response.ok) return
+
+          const payload = await response.json()
+          if (!payload?.success || !payload?.data) return
+
+          const fullName = String(payload.data.name || "").trim()
+          const parts = fullName.split(/\s+/).filter(Boolean)
+          const parsedAddress = splitComposedAddress(payload.data.direccion)
+
+          setProfileData((prev) => ({
+            ...prev,
+            nombre: parts[0] || prev.nombre,
+            apellido: parts.slice(1).join(" ") || prev.apellido,
+            email: String(payload.data.email || prev.email),
+            telefono: String(payload.data.telefono || prev.telefono),
+          }))
+
+          setAddressData((prev) => ({
+            ...prev,
+            calle: parsedAddress.calle || prev.calle,
+            numero: parsedAddress.numero || prev.numero,
+            colonia: parsedAddress.colonia || prev.colonia,
+            ciudad: String(payload.data.ciudad || prev.ciudad),
+            estado: String(payload.data.estado || prev.estado),
+            codigoPostal: String(payload.data.codigoPostal || prev.codigoPostal),
+          }))
+        } catch {
+          return
+        }
+      })()
     }
   }, [user, isLoading, router])
+
+  useEffect(() => {
+    if (isLoading || !user || user.role !== "buyer") return
+
+    void (async () => {
+      try {
+        setOrdersLoading(true)
+
+        const response = await fetch("/api/v1/orders", {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+        })
+
+        const payload = (await response.json()) as ApiResponse<ApiOrder[]>
+
+        if (!response.ok || !payload.success || !Array.isArray(payload.data)) {
+          setOrders([])
+          return
+        }
+
+        const mappedOrders: Order[] = payload.data.map((order) => ({
+          id: String(order._id),
+          date: new Date(order.createdAt).toLocaleDateString("es-MX", {
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+          }),
+          total: Number(order.totalAmount || 0),
+          status: order.status || "paid",
+          shippingStatus: order.shippingStatus,
+          items: Array.isArray(order.items)
+            ? order.items.reduce((acc, item) => acc + Number(item.quantity || 0), 0)
+            : 0,
+        }))
+
+        setOrders(mappedOrders)
+      } catch {
+        setOrders([])
+      } finally {
+        setOrdersLoading(false)
+      }
+    })()
+  }, [isLoading, user])
 
   const handleSaveProfile = async () => {
     try {
@@ -123,7 +273,9 @@ export default function AccountPage() {
     const isSeller = user?.role === "seller"
     if (
       isSeller &&
-      (!addressData.direccion.trim() ||
+      (!addressData.calle.trim() ||
+        !addressData.numero.trim() ||
+        !addressData.colonia.trim() ||
         !addressData.ciudad.trim() ||
         !addressData.estado.trim() ||
         !addressData.codigoPostal.trim())
@@ -134,11 +286,15 @@ export default function AccountPage() {
 
     try {
       setSavingAddress(true)
+      const direccionCompuesta = `${addressData.calle} ${addressData.numero}, ${addressData.colonia}`
+        .replace(/\s+/g, " ")
+        .trim()
+
       const response = await fetch("/api/v1/account/address", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          direccion: addressData.direccion,
+          direccion: direccionCompuesta,
           ciudad: addressData.ciudad,
           estado: addressData.estado,
           codigoPostal: addressData.codigoPostal,
@@ -153,7 +309,7 @@ export default function AccountPage() {
       }
 
       updateProfile({
-        direccion: addressData.direccion,
+        direccion: direccionCompuesta,
         ciudad: addressData.ciudad,
         estado: addressData.estado,
         codigoPostal: addressData.codigoPostal,
@@ -459,7 +615,9 @@ export default function AccountPage() {
                 <h2 className="mb-6 font-display text-lg font-bold uppercase tracking-wider text-foreground">
                   Mis Pedidos
                 </h2>
-                {orders.length === 0 ? (
+                {ordersLoading ? (
+                  <p className="text-sm text-muted-foreground">Cargando pedidos...</p>
+                ) : orders.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12 text-center">
                     <ShoppingBag className="mb-4 h-12 w-12 text-muted-foreground/30" />
                     <p className="font-display text-lg font-bold uppercase text-muted-foreground">
@@ -500,6 +658,9 @@ export default function AccountPage() {
                           <p className="text-sm font-bold text-foreground">
                             ${order.total} MXN
                           </p>
+                          <p className="text-xs text-amber-400">
+                            {shippingStatusLabel(order.shippingStatus)}
+                          </p>
                           <p className="text-xs text-muted-foreground">
                             {order.items} articulo{order.items > 1 ? "s" : ""}
                           </p>
@@ -526,20 +687,58 @@ export default function AccountPage() {
                   <p className="mb-4 text-xs font-medium text-destructive">{accountError}</p>
                 )}
                 <div className="flex flex-col gap-5">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                        Calle
+                      </label>
+                      <input
+                        type="text"
+                        value={addressData.calle}
+                        onChange={(e) =>
+                          setAddressData({
+                            ...addressData,
+                            calle: e.target.value,
+                          })
+                        }
+                        placeholder="Nombre de la calle"
+                        required={isSeller}
+                        className="w-full border border-border bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                        Numero
+                      </label>
+                      <input
+                        type="text"
+                        value={addressData.numero}
+                        onChange={(e) =>
+                          setAddressData({
+                            ...addressData,
+                            numero: e.target.value,
+                          })
+                        }
+                        placeholder="123"
+                        required={isSeller}
+                        className="w-full border border-border bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+                      />
+                    </div>
+                  </div>
                   <div>
                     <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                      Direccion completa
+                      Colonia
                     </label>
                     <input
                       type="text"
-                      value={addressData.direccion}
+                      value={addressData.colonia}
                       onChange={(e) =>
                         setAddressData({
                           ...addressData,
-                          direccion: e.target.value,
+                          colonia: e.target.value,
                         })
                       }
-                      placeholder="Calle, numero, colonia"
+                      placeholder="Tu colonia"
                       required={isSeller}
                       className="w-full border border-border bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-accent"
                     />
@@ -624,42 +823,90 @@ export default function AccountPage() {
                     <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-muted-foreground">
                       Contraseña actual
                     </label>
-                    <input
-                      type="password"
-                      value={passwordData.actual}
-                      onChange={(e) =>
-                        setPasswordData((prev) => ({ ...prev, actual: e.target.value }))
-                      }
-                      className="w-full border border-border bg-background px-4 py-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
-                    />
+                    <div className="relative">
+                      <input
+                        type={showPassword.actual ? "text" : "password"}
+                        value={passwordData.actual}
+                        onChange={(e) =>
+                          setPasswordData((prev) => ({ ...prev, actual: e.target.value }))
+                        }
+                        className="w-full border border-border bg-background px-4 py-3 pr-11 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setShowPassword((prev) => ({ ...prev, actual: !prev.actual }))
+                        }
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        aria-label={showPassword.actual ? "Ocultar contraseña actual" : "Mostrar contraseña actual"}
+                      >
+                        {showPassword.actual ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
                   </div>
 
                   <div>
                     <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-muted-foreground">
                       Nueva contraseña
                     </label>
-                    <input
-                      type="password"
-                      value={passwordData.nueva}
-                      onChange={(e) =>
-                        setPasswordData((prev) => ({ ...prev, nueva: e.target.value }))
-                      }
-                      className="w-full border border-border bg-background px-4 py-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
-                    />
+                    <div className="relative">
+                      <input
+                        type={showPassword.nueva ? "text" : "password"}
+                        value={passwordData.nueva}
+                        onChange={(e) =>
+                          setPasswordData((prev) => ({ ...prev, nueva: e.target.value }))
+                        }
+                        className="w-full border border-border bg-background px-4 py-3 pr-11 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setShowPassword((prev) => ({ ...prev, nueva: !prev.nueva }))
+                        }
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        aria-label={showPassword.nueva ? "Ocultar nueva contraseña" : "Mostrar nueva contraseña"}
+                      >
+                        {showPassword.nueva ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
                   </div>
 
                   <div>
                     <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-muted-foreground">
                       Confirmar nueva contraseña
                     </label>
-                    <input
-                      type="password"
-                      value={passwordData.confirmar}
-                      onChange={(e) =>
-                        setPasswordData((prev) => ({ ...prev, confirmar: e.target.value }))
-                      }
-                      className="w-full border border-border bg-background px-4 py-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
-                    />
+                    <div className="relative">
+                      <input
+                        type={showPassword.confirmar ? "text" : "password"}
+                        value={passwordData.confirmar}
+                        onChange={(e) =>
+                          setPasswordData((prev) => ({ ...prev, confirmar: e.target.value }))
+                        }
+                        className="w-full border border-border bg-background px-4 py-3 pr-11 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setShowPassword((prev) => ({ ...prev, confirmar: !prev.confirmar }))
+                        }
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        aria-label={showPassword.confirmar ? "Ocultar confirmación" : "Mostrar confirmación"}
+                      >
+                        {showPassword.confirmar ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -671,7 +918,7 @@ export default function AccountPage() {
                   type="button"
                   onClick={handleChangePassword}
                   disabled={savingPassword}
-                  className="mt-6 flex items-center gap-2 bg-accent px-6 py-3 text-sm font-bold uppercase tracking-widest text-accent-foreground transition-opacity hover:opacity-90"
+                  className="mt-6 flex w-full items-center justify-center gap-2 bg-accent px-6 py-3 text-sm font-bold uppercase tracking-widest text-accent-foreground transition-opacity hover:opacity-90 sm:w-80"
                 >
                   <Save className="h-4 w-4" />
                   {savingPassword ? "Guardando..." : "Actualizar contraseña"}
@@ -682,7 +929,7 @@ export default function AccountPage() {
                     type="button"
                     onClick={handleDeactivateAccount}
                     disabled={deactivating}
-                    className="mt-3 flex items-center gap-2 border border-destructive px-6 py-3 text-sm font-bold uppercase tracking-widest text-destructive"
+                    className="mt-3 flex w-full items-center justify-center gap-2 border border-destructive px-6 py-3 text-sm font-bold uppercase tracking-widest text-destructive sm:w-80"
                   >
                     {deactivating ? "Desactivando..." : "Desactivar cuenta"}
                   </button>

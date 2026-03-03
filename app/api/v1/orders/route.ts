@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createOrder, getOrdersByBuyer } from "@/lib/services/order.service"
+import {
+  createOrder,
+  getAllOrders,
+  getOrdersByBuyer,
+  getOrdersBySeller,
+} from "@/lib/services/order.service"
 import { createOrderSchema } from "@/lib/validations/order.schema"
 import type { ApiResponse } from "@/lib/types"
 import { getRequestAuth } from "@/lib/auth/request-auth"
@@ -60,6 +65,40 @@ export async function GET(req: NextRequest) {
       return NextResponse.json<ApiResponse>(
         { success: false, error: "Se requiere autenticación" },
         { status: 401 }
+      )
+    }
+
+    const scope = req.nextUrl.searchParams.get("scope") || "buyer"
+
+    if (scope === "seller") {
+      if (auth.role !== "seller") {
+        return NextResponse.json<ApiResponse>(
+          { success: false, error: "Solo vendedores pueden consultar este listado" },
+          { status: 403 }
+        )
+      }
+
+      const orders = await getOrdersBySeller(auth.userId)
+
+      return NextResponse.json<ApiResponse>(
+        { success: true, data: orders },
+        { status: 200 }
+      )
+    }
+
+    if (scope === "admin") {
+      if (auth.role !== "superadmin") {
+        return NextResponse.json<ApiResponse>(
+          { success: false, error: "Solo administradores pueden consultar este listado" },
+          { status: 403 }
+        )
+      }
+
+      const orders = await getAllOrders()
+
+      return NextResponse.json<ApiResponse>(
+        { success: true, data: orders },
+        { status: 200 }
       )
     }
 

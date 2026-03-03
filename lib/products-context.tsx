@@ -42,7 +42,7 @@ export function ProductsProvider({ children }: { children: ReactNode }) {
         images: Array.isArray(item.imageUrls)
           ? item.imageUrls.map((url) => String(url))
           : [String(item.imageUrl ?? "/placeholder.svg")],
-        category: String(item.category ?? "General"),
+        category: String(item.category ?? "Snapback"),
         description: String(item.description ?? ""),
         stock: Number(item.stock ?? 0),
       }))

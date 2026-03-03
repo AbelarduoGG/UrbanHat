@@ -13,6 +13,21 @@ export interface IOrder extends Document {
   items: IOrderItem[]
   totalAmount: number
   status: "pending" | "paid" | "shipped" | "cancelled"
+  paymentProvider?: "stripe"
+  paymentSessionId?: string
+  shippingStatus: "seller_received" | "preparing" | "shipped" | "delivered"
+  shippingAddress?: {
+    nombre: string
+    apellido: string
+    email: string
+    telefono: string
+    calle: string
+    numero: string
+    colonia: string
+    ciudad: string
+    estado: string
+    codigoPostal: string
+  }
   createdAt: Date
 }
 
@@ -39,6 +54,32 @@ const OrderSchema = new Schema<IOrder>({
     type: String,
     enum: ["pending", "paid", "shipped", "cancelled"],
     default: "paid",
+  },
+  paymentProvider: {
+    type: String,
+    enum: ["stripe"],
+  },
+  paymentSessionId: {
+    type: String,
+    unique: true,
+    sparse: true,
+  },
+  shippingStatus: {
+    type: String,
+    enum: ["seller_received", "preparing", "shipped", "delivered"],
+    default: "seller_received",
+  },
+  shippingAddress: {
+    nombre: { type: String },
+    apellido: { type: String },
+    email: { type: String },
+    telefono: { type: String },
+    calle: { type: String },
+    numero: { type: String },
+    colonia: { type: String },
+    ciudad: { type: String },
+    estado: { type: String },
+    codigoPostal: { type: String },
   },
   createdAt: { type: Date, default: Date.now },
 })
