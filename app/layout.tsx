@@ -1,7 +1,7 @@
 import React from "react"
 import type { Metadata, Viewport } from "next"
 import { Inter, Oswald } from "next/font/google"
-import RegisterSW from "@/components/RegisterSW" // ✅ IMPORT ARRIBA
+import { PwaRegister } from "@/components/pwa-register"
 
 import "./globals.css"
 
@@ -32,7 +32,6 @@ export default function RootLayout({
   return (
     <html lang="es">
       <head>
-        {/* ✅ MANIFEST */}
         <link rel="manifest" href="/manifest.webmanifest" />
         <link rel="icon" type="image/png" sizes="192x192" href="/logo-192.png" />
         <link rel="shortcut icon" href="/logo-192.png" />
@@ -40,8 +39,7 @@ export default function RootLayout({
       </head>
 
       <body className={`${_inter.variable} ${_oswald.variable}`}>
-        {/* ✅ REGISTRO DEL SERVICE WORKER */}
-        <RegisterSW />
+        <PwaRegister />
 
         {children}
       </body>

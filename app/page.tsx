@@ -12,12 +12,10 @@ import { ContactSection } from "@/components/contact-section"
 import { Footer } from "@/components/footer"
 import { CartDrawer } from "@/components/cart-drawer"
 import InstallPWAButton from "@/components/InstallPWAButton"
-import RegisterSW from "@/components/RegisterSW"
 
 export default function Page() {
   return (
     <AuthProvider>
-  <RegisterSW />
       <ProductsProvider>
         <CartProvider>
           <Navbar />

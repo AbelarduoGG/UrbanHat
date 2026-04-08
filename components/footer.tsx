@@ -4,37 +4,8 @@
 
 import Image from "next/image"
 import Link from "next/link"
-import { useEffect, useState } from "react"
 
 export function Footer() {
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
-  const [showInstall, setShowInstall] = useState(false)
-
-  useEffect(() => {
-    const handler = (e: any) => {
-      e.preventDefault()
-      setDeferredPrompt(e)
-      setShowInstall(true)
-    }
-
-    window.addEventListener("beforeinstallprompt", handler)
-
-    return () => window.removeEventListener("beforeinstallprompt", handler)
-  }, [])
-
-  const handleInstallClick = async () => {
-    if (!deferredPrompt) return
-
-    deferredPrompt.prompt()
-    const { outcome } = await deferredPrompt.userChoice
-
-    if (outcome === "accepted") {
-      setShowInstall(false)
-    }
-
-    setDeferredPrompt(null)
-  }
-
   return (
     <footer className="border-t border-border bg-background px-4 py-16 lg:px-8">
       <div className="mx-auto max-w-7xl">

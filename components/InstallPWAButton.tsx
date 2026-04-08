@@ -3,20 +3,24 @@
 import { useEffect, useState } from "react"
 import { Download } from "lucide-react"
 
+type BeforeInstallPromptEvent = Event & {
+  prompt: () => Promise<void>
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>
+}
+
 export default function InstallPWAButton() {
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
-  const [isInstallable, setIsInstallable] = useState(false)
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
 
   useEffect(() => {
-    const handler = (e: any) => {
-      e.preventDefault()
-      setDeferredPrompt(e)
-      setIsInstallable(true)
+    const handler = (e: Event) => {
+      const promptEvent = e as BeforeInstallPromptEvent
+      promptEvent.preventDefault()
+      setDeferredPrompt(promptEvent)
     }
 
-    window.addEventListener("beforeinstallprompt", handler)
+    window.addEventListener("beforeinstallprompt", handler as EventListener)
 
-    return () => window.removeEventListener("beforeinstallprompt", handler)
+    return () => window.removeEventListener("beforeinstallprompt", handler as EventListener)
   }, [])
 
   const handleInstall = async () => {
@@ -24,7 +28,6 @@ export default function InstallPWAButton() {
       deferredPrompt.prompt()
       await deferredPrompt.userChoice
       setDeferredPrompt(null)
-      setIsInstallable(false)
     } else {
       alert("Para instalar, usa el menú de tu navegador → 'Agregar a pantalla de inicio'")
     }
