@@ -1,122 +1,46 @@
-import { NextRequest, NextResponse } from "next/server"
-import { getRequestAuth } from "@/lib/auth/request-auth"
-import { updateProductSchema } from "@/lib/validations/product.schema"
-import { deleteProduct, updateProduct } from "@/lib/services/product.service"
-import type { ApiResponse } from "@/lib/types"
+import { NextResponse } from "next/server"
+import { connectDB } from "@/lib/db"
+import { Order } from "@/lib/db/models"
 
-interface RouteParams {
-  params: Promise<{ id: string }>
-}
+export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+  await connectDB()
 
-export async function PATCH(req: NextRequest, context: RouteParams) {
+  const { id } = params
+  const body = await req.json()
+
+  const { shippingStatus, carrier, trackingNumber } = body
+
   try {
-    const auth = getRequestAuth(req)
+    // 🔥 BUSCAR POR orderNumber (o fallback a _id)
+    const order = await Order.findOne({
+      $or: [
+        { orderNumber: id }, // 👈 NUEVO
+        { _id: id }          // 👈 fallback
+      ]
+    })
 
-    if (!auth) {
-      return NextResponse.json<ApiResponse>(
-        { success: false, error: "Se requiere autenticación" },
-        { status: 401 }
-      )
-    }
-
-    if (auth.role !== "seller") {
-      return NextResponse.json<ApiResponse>(
-        { success: false, error: "Solo vendedores pueden editar productos" },
-        { status: 403 }
-      )
-    }
-
-    const { id } = await context.params
-    const body = await req.json()
-    const parsed = updateProductSchema.safeParse(body)
-
-    if (!parsed.success) {
-      return NextResponse.json<ApiResponse>(
-        { success: false, error: parsed.error.errors[0].message },
-        { status: 400 }
-      )
-    }
-
-    const updates = {
-      ...parsed.data,
-      ...(parsed.data.imageUrls?.length
-        ? { imageUrl: parsed.data.imageUrls[0] }
-        : {}),
-    }
-
-    const product = await updateProduct(id, auth.userId, updates)
-
-    if (!product) {
-      return NextResponse.json<ApiResponse>(
-        {
-          success: false,
-          error: "Producto no encontrado o no pertenece al vendedor",
-        },
+    if (!order) {
+      return NextResponse.json(
+        { success: false, error: "Pedido no encontrado" },
         { status: 404 }
       )
     }
 
-    return NextResponse.json<ApiResponse>(
-      {
-        success: true,
-        data: {
-          ...product,
-          imageUrl: product?.imageUrls?.[0] || product?.imageUrl,
-          imageUrls: product?.imageUrls?.length
-            ? product.imageUrls
-            : product?.imageUrl
-              ? [product.imageUrl]
-              : [],
-          status: product?.status || "active",
-        },
-      },
-      { status: 200 }
-    )
+    if (shippingStatus) order.shippingStatus = shippingStatus
+    if (carrier) order.carrier = carrier
+    if (trackingNumber) order.trackingNumber = trackingNumber
+
+    await order.save()
+
+    return NextResponse.json({
+      success: true,
+      data: order,
+    })
   } catch (error) {
-    console.error("[PATCH /api/v1/products/:id]", error)
-    return NextResponse.json<ApiResponse>(
-      { success: false, error: "Error interno del servidor" },
-      { status: 500 }
-    )
-  }
-}
+    console.error("ERROR PATCH SHIPPING:", error)
 
-export async function DELETE(req: NextRequest, context: RouteParams) {
-  try {
-    const auth = getRequestAuth(req)
-
-    if (!auth) {
-      return NextResponse.json<ApiResponse>(
-        { success: false, error: "Se requiere autenticación" },
-        { status: 401 }
-      )
-    }
-
-    if (auth.role !== "seller") {
-      return NextResponse.json<ApiResponse>(
-        { success: false, error: "Solo vendedores pueden eliminar productos" },
-        { status: 403 }
-      )
-    }
-
-    const { id } = await context.params
-    const product = await deleteProduct(id, auth.userId)
-
-    if (!product) {
-      return NextResponse.json<ApiResponse>(
-        {
-          success: false,
-          error: "Producto no encontrado o no pertenece al vendedor",
-        },
-        { status: 404 }
-      )
-    }
-
-    return NextResponse.json<ApiResponse>({ success: true, data: product }, { status: 200 })
-  } catch (error) {
-    console.error("[DELETE /api/v1/products/:id]", error)
-    return NextResponse.json<ApiResponse>(
-      { success: false, error: "Error interno del servidor" },
+    return NextResponse.json(
+      { success: false, error: "Error al actualizar envío" },
       { status: 500 }
     )
   }

@@ -74,29 +74,40 @@ export async function createOrder(
     })
   }
 
-  const order = new Order({
-    buyerId,
-    items: orderItems,
-    totalAmount,
-    status: "paid",
-    paymentProvider: options?.paymentProvider,
-    paymentSessionId: options?.paymentSessionId,
-    shippingStatus: "seller_received",
-    shippingAddress: options?.shippingAddress,
-  })
+const order = new Order({
+  buyerId,
+  items: orderItems,
+  totalAmount,
+  status: "paid",
+  paymentProvider: options?.paymentProvider,
+  paymentSessionId: options?.paymentSessionId,
+
+  shippingStatus: "seller_received",
+  trackingNumber: "",
+  carrier: "",
+
+  shippingAddress: options?.shippingAddress,
+})
 
   return order.save()
 }
 
 export async function getOrdersByBuyer(buyerId: string) {
   await connectDB()
-  return Order.find({ buyerId }).sort({ createdAt: -1 }).lean()
+  return Order.find({ buyerId })
+    .populate("items.sellerId", "name")
+    .sort({ createdAt: -1 })
+    .lean()
 }
 
 export async function getOrdersBySeller(sellerId: string) {
   await connectDB()
+
   return Order.find({ "items.sellerId": sellerId })
     .populate("buyerId", "name email")
+    .select(
+      "items buyerId totalAmount status shippingStatus trackingNumber carrier createdAt"
+    )
     .sort({ createdAt: -1 })
     .lean()
 }
@@ -108,3 +119,43 @@ export async function getAllOrders() {
     .sort({ createdAt: -1 })
     .lean()
 }
+
+export async function updateOrderShipping(
+  orderId: string,
+  data: {
+    shippingStatus?: string
+    trackingNumber?: string
+    carrier?: string
+  }
+) {
+  await connectDB()
+
+  const order = await Order.findById(orderId)
+  if (!order) return null
+
+  const messages: string[] = []
+
+  if (data.shippingStatus !== undefined && data.shippingStatus !== order.shippingStatus) {
+    messages.push(`Estado: ${data.shippingStatus}`)
+    order.shippingStatus = data.shippingStatus
+  }
+
+  if (data.carrier !== undefined && data.carrier !== order.carrier) {
+    messages.push(`Paquetería: ${data.carrier}`)
+    order.carrier = data.carrier
+  }
+
+  if (data.trackingNumber !== undefined && data.trackingNumber !== order.trackingNumber) {
+    messages.push(`Guía: ${data.trackingNumber}`)
+    order.trackingNumber = data.trackingNumber
+  }
+
+  if (messages.length > 0) {
+    order.buyerNotification = `El vendedor actualizó tu pedido: ${messages.join(", ")}`
+    order.buyerNotificationAt = new Date()
+  }
+
+  return order.save()
+}
+
+

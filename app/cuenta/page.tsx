@@ -2,7 +2,7 @@
 
 import React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -19,7 +19,10 @@ import {
   CheckCircle2,
   Eye,
   EyeOff,
+  AlertTriangle,
 } from "lucide-react"
+import { toast } from "@/hooks/use-toast"
+import { Toaster } from "@/components/ui/toaster"
 import { useAuth } from "@/lib/auth-context"
 
 type Tab = "perfil" | "pedidos" | "direccion" | "seguridad"
@@ -53,13 +56,35 @@ function splitComposedAddress(direccion?: string) {
   }
 }
 
+interface OrderItem {
+  productId: string
+  name: string
+  quantity: number
+  priceAtPurchase: number
+}
+
 interface Order {
   id: string
   date: string
   total: number
   status: string
   shippingStatus?: string
-  items: number
+  items: OrderItem[]
+  trackingNumber?: string
+  carrier?: string
+  sellerName?: string
+  buyerNotification?: string
+}
+
+interface ApiOrderItem {
+  productId: string
+  sellerId: {
+    _id: string
+    name: string
+  }
+  name: string
+  quantity: number
+  priceAtPurchase: number
 }
 
 interface ApiOrder {
@@ -68,7 +93,11 @@ interface ApiOrder {
   status: string
   shippingStatus?: string
   createdAt: string
-  items: Array<{ quantity: number }>
+  items: ApiOrderItem[]
+  trackingNumber?: string
+  carrier?: string
+  buyerNotification?: string
+  buyerNotificationAt?: string
 }
 
 interface ApiResponse<T = unknown> {
@@ -92,6 +121,7 @@ export default function AccountPage() {
   const [saved, setSaved] = useState(false)
   const [orders, setOrders] = useState<Order[]>([])
   const [ordersLoading, setOrdersLoading] = useState(false)
+  const [expandedOrder, setExpandedOrder] = useState<string | null>(null)
 
   const [profileData, setProfileData] = useState({
     nombre: "",
@@ -188,10 +218,12 @@ export default function AccountPage() {
     }
   }, [user, isLoading, router])
 
+  const displayedNotificationsRef = useRef<Record<string, string>>({})
+
   useEffect(() => {
     if (isLoading || !user || user.role !== "buyer") return
 
-    void (async () => {
+    const fetchOrders = async () => {
       try {
         setOrdersLoading(true)
 
@@ -199,6 +231,7 @@ export default function AccountPage() {
           method: "GET",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
+          cache: "no-store",
         })
 
         const payload = (await response.json()) as ApiResponse<ApiOrder[]>
@@ -218,10 +251,32 @@ export default function AccountPage() {
           total: Number(order.totalAmount || 0),
           status: order.status || "paid",
           shippingStatus: order.shippingStatus,
+          trackingNumber: order.trackingNumber,
+          carrier: order.carrier,
+          buyerNotification: String(order.buyerNotification || ""),
           items: Array.isArray(order.items)
-            ? order.items.reduce((acc, item) => acc + Number(item.quantity || 0), 0)
-            : 0,
+            ? order.items.map((item) => ({
+                productId: item.productId,
+                name: item.name,
+                quantity: item.quantity,
+                priceAtPurchase: item.priceAtPurchase,
+              }))
+            : [],
+          sellerName: order.items?.[0]?.sellerId?.name || "Vendedor desconocido",
         }))
+
+        mappedOrders.forEach((order) => {
+          if (
+            order.buyerNotification &&
+            displayedNotificationsRef.current[order.id] !== order.buyerNotification
+          ) {
+            toast({
+              title: "Actualización de pedido",
+              description: order.buyerNotification,
+            })
+            displayedNotificationsRef.current[order.id] = order.buyerNotification
+          }
+        })
 
         setOrders(mappedOrders)
       } catch {
@@ -229,7 +284,11 @@ export default function AccountPage() {
       } finally {
         setOrdersLoading(false)
       }
-    })()
+    }
+
+    void fetchOrders()
+    const intervalId = window.setInterval(fetchOrders, 15000)
+    return () => window.clearInterval(intervalId)
   }, [isLoading, user])
 
   const handleSaveProfile = async () => {
@@ -638,33 +697,109 @@ export default function AccountPage() {
                     {orders.map((order) => (
                       <div
                         key={order.id}
-                        className="flex items-center justify-between border border-border p-4"
+                        className="border border-border bg-card"
                       >
-                        <div className="flex items-center gap-4">
-                          <div className="flex h-10 w-10 items-center justify-center bg-primary">
-                            <Package className="h-5 w-5 text-primary-foreground" />
+                        <div
+                          className="flex cursor-pointer items-center justify-between p-4 hover:bg-secondary/50"
+                          onClick={() => setExpandedOrder(expandedOrder === order.id ? null : order.id)}
+                        >
+                          <div className="flex items-center gap-4">
+                            <div className="flex h-10 w-10 items-center justify-center bg-primary">
+                              <Package className="h-5 w-5 text-primary-foreground" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-bold text-foreground">
+                                Pedido {order.id.slice(-8)}
+                              </p>
+                              <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <Clock className="h-3 w-3" />
+                                {order.date}
+                              </p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="text-sm font-bold text-foreground">
-                              {order.id}
-                            </p>
-                            <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                              <Clock className="h-3 w-3" />
-                              {order.date}
-                            </p>
+                          <div className="flex items-center gap-4">
+                            <div className="text-right">
+                              <p className="text-sm font-bold text-foreground">
+                                ${order.total} MXN
+                              </p>
+                              <p className="text-xs text-amber-400">
+                                {shippingStatusLabel(order.shippingStatus)}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {order.items.length} artículo{order.items.length > 1 ? "s" : ""}
+                              </p>
+                            </div>
+                            <Eye className={`h-4 w-4 text-muted-foreground transition-transform ${expandedOrder === order.id ? 'rotate-180' : ''}`} />
                           </div>
                         </div>
-                        <div className="text-right">
-                          <p className="text-sm font-bold text-foreground">
-                            ${order.total} MXN
-                          </p>
-                          <p className="text-xs text-amber-400">
-                            {shippingStatusLabel(order.shippingStatus)}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {order.items} articulo{order.items > 1 ? "s" : ""}
-                          </p>
-                        </div>
+
+                        {expandedOrder === order.id && (
+                          <div className="border-t border-border p-4">
+                            <div className="space-y-4">
+                              {order.buyerNotification && (
+                              <div className="rounded border border-amber-300/40 bg-amber-50 p-4 text-sm text-amber-900">
+                                <div className="mb-2 flex items-center gap-2 font-semibold uppercase tracking-wide text-amber-800">
+                                  <AlertTriangle className="h-4 w-4" />
+                                  Actualización de envío
+                                </div>
+                                <p>{order.buyerNotification}</p>
+                              </div>
+                            )}
+                            {/* Información de envío */}
+                              {(order.trackingNumber || order.carrier) && (
+                                <div>
+                                  <h4 className="mb-2 text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                                    Información de envío
+                                  </h4>
+                                  <div className="space-y-1">
+                                    {order.carrier && (
+                                      <p className="text-sm text-foreground">
+                                        <span className="font-medium">Paquetería:</span> {order.carrier}
+                                      </p>
+                                    )}
+                                    {order.trackingNumber && (
+                                      <p className="text-sm text-foreground">
+                                        <span className="font-medium">Guía de embarque:</span> {order.trackingNumber}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Vendedor */}
+                              {order.sellerName && (
+                                <div>
+                                  <h4 className="mb-2 text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                                    Vendedor
+                                  </h4>
+                                  <p className="text-sm text-foreground">{order.sellerName}</p>
+                                </div>
+                              )}
+
+                              {/* Productos */}
+                              <div>
+                                <h4 className="mb-2 text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                                  Productos
+                                </h4>
+                                <div className="space-y-2">
+                                  {order.items.map((item, index) => (
+                                    <div key={`${item.productId}-${index}`} className="flex items-center justify-between border border-border p-3">
+                                      <div>
+                                        <p className="text-sm font-medium text-foreground">{item.name}</p>
+                                        <p className="text-xs text-muted-foreground">
+                                          Cantidad: {item.quantity}
+                                        </p>
+                                      </div>
+                                      <p className="text-sm font-bold text-foreground">
+                                        ${item.priceAtPurchase * item.quantity} MXN
+                                      </p>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -939,6 +1074,7 @@ export default function AccountPage() {
           </div>
         </div>
       </div>
+      <Toaster />
     </div>
   )
 }

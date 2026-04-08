@@ -9,9 +9,10 @@ import { useCart } from "@/lib/cart-context"
 interface ProductModalProps {
   product: Product
   onClose: () => void
+  canBuy: boolean
 }
 
-export function ProductModal({ product, onClose }: ProductModalProps) {
+export function ProductModal({ product, onClose, canBuy }: ProductModalProps) {
   const [quantity, setQuantity] = useState(1)
   const images = product.images?.length ? product.images : [product.image]
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
@@ -142,7 +143,7 @@ export function ProductModal({ product, onClose }: ProductModalProps) {
             )}
           </div>
 
-          {/* Quantity selector */}
+         {canBuy && (
           <div className="mt-4 flex items-center gap-4">
             <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
               Cantidad
@@ -152,26 +153,28 @@ export function ProductModal({ product, onClose }: ProductModalProps) {
                 type="button"
                 onClick={() => setQuantity(Math.max(1, quantity - 1))}
                 className="flex h-10 w-10 items-center justify-center text-foreground transition-colors hover:bg-secondary"
-                aria-label="Disminuir cantidad"
               >
                 <Minus className="h-4 w-4" />
               </button>
+
               <span className="flex h-10 w-12 items-center justify-center border-x border-border text-sm font-bold text-foreground">
                 {quantity}
               </span>
+
               <button
                 type="button"
                 onClick={() =>
                   setQuantity(Math.min(product.stock, quantity + 1))
                 }
                 className="flex h-10 w-10 items-center justify-center text-foreground transition-colors hover:bg-secondary"
-                aria-label="Aumentar cantidad"
               >
                 <Plus className="h-4 w-4" />
               </button>
             </div>
           </div>
+        )}
 
+        {canBuy && (
           <button
             type="button"
             onClick={handleAdd}
@@ -185,6 +188,7 @@ export function ProductModal({ product, onClose }: ProductModalProps) {
             <ShoppingBag className="h-4 w-4" />
             {product.stock === 0 ? "Agotado" : "Agregar al Carrito"}
           </button>
+        )}
         </div>
       </div>
     </div>
