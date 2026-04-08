@@ -32,6 +32,30 @@ export default function RootLayout({
   return (
     <html lang="es">
       <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function () {
+  if (location.hostname !== 'localhost') return;
+  if (!('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.getRegistrations()
+    .then(function (registrations) {
+      return Promise.all(registrations.map(function (registration) {
+        return registration.unregister();
+      }));
+    })
+    .catch(function () {});
+  if ('caches' in window) {
+    caches.keys()
+      .then(function (keys) {
+        return Promise.all(keys.map(function (key) {
+          return caches.delete(key);
+        }));
+      })
+      .catch(function () {});
+  }
+})();`,
+          }}
+        />
         <link rel="manifest" href="/manifest.webmanifest" />
         <link rel="icon" type="image/png" sizes="192x192" href="/logo-192.png" />
         <link rel="shortcut icon" href="/logo-192.png" />

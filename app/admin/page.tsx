@@ -706,25 +706,25 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background px-4 py-8 lg:px-8">
+    <div className="min-h-screen overflow-x-hidden bg-background px-4 py-8 lg:px-8">
       <div className="mx-auto max-w-7xl">
 
         {/* Header */}
-        <div className="mb-8 flex items-center justify-between border border-border bg-card p-4">
-          <div>
-            <h1 className="font-display text-2xl font-bold uppercase tracking-wider text-foreground">
+        <div className="mb-8 flex flex-col gap-4 border border-border bg-card p-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <h1 className="font-display text-xl font-bold uppercase tracking-wider text-foreground sm:text-2xl">
               Panel de control
             </h1>
             <p className="text-sm text-muted-foreground">{me.email}</p>
           </div>
-          <div className="flex gap-2">
-            <Link href="/cuenta" className="border border-border px-4 py-2 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground">
+          <div className="grid w-full grid-cols-1 gap-2 min-[380px]:grid-cols-2 sm:w-auto sm:flex sm:flex-wrap sm:justify-end">
+            <Link href="/cuenta" className="inline-flex min-w-0 items-center justify-center border border-border px-2 py-2 text-center text-[11px] font-bold uppercase tracking-wide text-muted-foreground hover:text-foreground min-[430px]:px-3 min-[430px]:text-xs sm:px-4 sm:tracking-wider">
               Mi perfil
             </Link>
-            <Link href="/" className="border border-border px-4 py-2 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground">
+            <Link href="/" className="inline-flex min-w-0 items-center justify-center border border-border px-2 py-2 text-center text-[11px] font-bold uppercase tracking-wide text-muted-foreground hover:text-foreground min-[430px]:px-3 min-[430px]:text-xs sm:px-4 sm:tracking-wider">
               Ir a tienda
             </Link>
-            <button type="button" onClick={handleLogout} className="flex items-center gap-2 bg-destructive px-4 py-2 text-xs font-bold uppercase tracking-wider text-destructive-foreground">
+            <button type="button" onClick={handleLogout} className="inline-flex min-w-0 items-center justify-center gap-2 bg-destructive px-2 py-2 text-center text-[11px] font-bold uppercase tracking-wide text-destructive-foreground min-[380px]:col-span-2 min-[430px]:px-3 min-[430px]:text-xs sm:col-span-1 sm:px-4 sm:tracking-wider">
               <LogOut className="h-4 w-4" />
               Salir
             </button>
@@ -846,7 +846,7 @@ export default function AdminPage() {
                           Rol: {roleLabel(user.role)} {user.shopName ? `• ${user.shopName}` : ""}
                         </p>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2 md:justify-end">
                         {canEdit && (
                           <>
                             <button type="button" onClick={() => handleUserPatch(uid, { isActive: !user.isActive })} className="border border-border px-3 py-1 text-xs font-bold uppercase">

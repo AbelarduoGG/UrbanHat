@@ -1,4 +1,4 @@
-const CACHE_NAME = "urbanhat-v7"
+const CACHE_NAME = "urbanhat-v8"
 const API_CACHE = "urbanhat-api-v4"
 
 // INSTALAR
@@ -24,6 +24,10 @@ self.addEventListener("activate", (event) => {
 
 // FETCH
 self.addEventListener("fetch", (event) => {
+  if (self.location.hostname === "localhost" || self.location.hostname === "127.0.0.1") {
+    return
+  }
+
   const url = new URL(event.request.url)
 
   // 🔥 HTML (navegación)

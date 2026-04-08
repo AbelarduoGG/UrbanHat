@@ -485,8 +485,8 @@ export default function AccountPage() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b border-border bg-background/90 backdrop-blur-md">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4">
-          <Link href="/" className="flex items-center gap-3">
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-4">
+          <Link href="/" className="flex min-w-0 items-center gap-3">
             <Image
               src="/logo.jpeg"
               alt="Urban Hat"
@@ -494,33 +494,33 @@ export default function AccountPage() {
               height={40}
               className="rounded-full"
             />
-            <span className="font-display text-lg font-bold uppercase tracking-widest text-foreground">
+            <span className="truncate font-display text-base font-bold uppercase tracking-widest text-foreground sm:text-lg">
               Urban Hat
             </span>
           </Link>
-          <div className="flex items-center gap-4">
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-2 min-[430px]:gap-3 sm:gap-4">
             {(user.role === "superadmin" || user.role === "seller") && (
               <Link
                 href="/admin"
-                className="text-sm font-medium uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground"
+                className="hidden text-xs font-medium uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground min-[430px]:inline sm:text-sm"
               >
                 Ir al panel
               </Link>
             )}
             <Link
               href="/"
-              className="flex items-center gap-2 text-sm font-medium uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground"
+              className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground sm:text-sm"
             >
               <ArrowLeft className="h-4 w-4" />
-              <span className="hidden sm:inline">Tienda</span>
+              <span className="hidden min-[380px]:inline">Tienda</span>
             </Link>
             <button
               type="button"
               onClick={handleLogout}
-              className="flex items-center gap-1.5 text-sm font-medium uppercase tracking-wider text-muted-foreground transition-colors hover:text-destructive"
+              className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-muted-foreground transition-colors hover:text-destructive sm:text-sm"
             >
               <LogOut className="h-4 w-4" />
-              <span className="hidden sm:inline">Salir</span>
+              <span className="hidden min-[380px]:inline">Salir</span>
             </button>
           </div>
         </div>
@@ -562,13 +562,13 @@ export default function AccountPage() {
         <div className="grid gap-6 lg:grid-cols-4">
           {/* Sidebar tabs */}
           <div className="lg:col-span-1">
-            <nav className="flex flex-row gap-1 lg:flex-col">
+            <nav className="grid grid-cols-2 gap-2 lg:flex lg:flex-col">
               {tabs.map((tab) => (
                 <button
                   key={tab.key}
                   type="button"
                   onClick={() => setActiveTab(tab.key)}
-                  className={`flex flex-1 items-center gap-2 px-4 py-3 text-left text-sm font-medium uppercase tracking-wider transition-colors lg:flex-none ${
+                  className={`inline-flex min-w-0 items-center justify-center gap-2 px-3 py-3 text-center text-xs font-medium uppercase tracking-wide transition-colors min-[430px]:text-sm min-[430px]:tracking-wider lg:justify-start lg:px-4 lg:text-left lg:flex-none ${
                     activeTab === tab.key
                       ? "bg-accent text-accent-foreground"
                       : "text-muted-foreground hover:bg-secondary hover:text-foreground"
