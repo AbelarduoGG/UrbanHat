@@ -179,6 +179,16 @@ const SHIPPING_OPTIONS = [
 ]
 
 const CARRIERS = ["DHL", "FedEx", "Estafeta", "UPS", "Correos de México"]
+const CATEGORY_PIE_COLORS = [
+  "#22c55e",
+  "#86efac",
+  "#34d399",
+  "#10b981",
+  "#4ade80",
+  "#84cc16",
+  "#3b82f6",
+  "#a78bfa",
+]
 
 function normalizeProductCategory(value: string): (typeof PRODUCT_CATEGORIES)[number] {
   return PRODUCT_CATEGORIES.includes(value as (typeof PRODUCT_CATEGORIES)[number])
@@ -396,6 +406,7 @@ export default function AdminPage() {
     if (me.role === "superadmin") {
       refreshUsers()
       refreshAdminProducts()
+      refreshSellerSales()
       return
     }
     if (me.role === "seller") {
@@ -443,7 +454,8 @@ export default function AdminPage() {
   const refreshSellerSales = async () => {
     try {
       setLoadingSales(true)
-      const response = await fetch("/api/v1/orders?scope=seller", { cache: "no-store" })
+      const scope = me?.role === "superadmin" ? "admin" : "seller"
+      const response = await fetch(`/api/v1/orders?scope=${scope}`, { cache: "no-store" })
       const payload = (await response.json()) as ApiResponse<OrderDto[]>
       if (!response.ok || !payload.success || !payload.data) {
         setSalesRows([])
@@ -451,10 +463,14 @@ export default function AdminPage() {
       }
       const rows: SellerSaleRow[] = []
       for (const order of payload.data) {
-        const sellerItems = (order.items || []).filter(
-          (item) => String(item.sellerId) === String(me?.id)
-        )
-        for (const item of sellerItems) {
+        const sourceItems =
+          me?.role === "superadmin"
+            ? order.items || []
+            : (order.items || []).filter(
+                (item) => String(item.sellerId) === String(me?.id)
+              )
+
+        for (const item of sourceItems) {
           rows.push({
             orderId: String(order._id),
             date: new Date(order.createdAt).toLocaleDateString("es-MX"),
@@ -470,7 +486,6 @@ export default function AdminPage() {
           })
         }
       }
-      console.log("Setting sales rows:", rows)
       setSalesRows(rows)
     } finally {
       setLoadingSales(false)
@@ -772,11 +787,11 @@ export default function AdminPage() {
                       <div className="h-64">
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart data={productsBySeller}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="name" />
-                            <YAxis />
+                            <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                            <XAxis dataKey="name" tickLine={false} axisLine={false} />
+                            <YAxis allowDecimals={false} tickLine={false} axisLine={false} />
                             <Tooltip />
-                            <Bar dataKey="total" fill="#f97316" />
+                            <Bar dataKey="total" fill="#f97316" radius={[6, 6, 0, 0]} />
                           </BarChart>
                         </ResponsiveContainer>
                       </div>
@@ -785,13 +800,23 @@ export default function AdminPage() {
                       <p className="mb-2 text-xs font-bold uppercase">Productos por categoría</p>
                       <div className="h-64">
                         <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={productsByCategory}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="name" />
-                            <YAxis />
+                          <PieChart>
+                            <Pie
+                              data={productsByCategory}
+                              dataKey="total"
+                              nameKey="name"
+                              innerRadius={50}
+                              outerRadius={90}
+                              paddingAngle={3}
+                              labelLine={false}
+                            >
+                              {productsByCategory.map((_, index) => (
+                                <Cell key={index} fill={CATEGORY_PIE_COLORS[index % CATEGORY_PIE_COLORS.length]} />
+                              ))}
+                            </Pie>
                             <Tooltip />
-                            <Bar dataKey="total" fill="#22c55e" />
-                          </BarChart>
+                            <Legend />
+                          </PieChart>
                         </ResponsiveContainer>
                       </div>
                     </div>
@@ -799,28 +824,34 @@ export default function AdminPage() {
                       <p className="mb-2 text-xs font-bold uppercase">Estado de productos</p>
                       <div className="h-64">
                         <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={productsByStatus}>
+                          <AreaChart data={productsByStatus}>
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis dataKey="name" />
-                            <YAxis />
+                            <YAxis allowDecimals={false} />
                             <Tooltip />
-                            <Bar dataKey="total" fill="#3b82f6" />
-                          </BarChart>
+                            <Area type="monotone" dataKey="total" stroke="#3b82f6" fill="#93c5fd" />
+                          </AreaChart>
                         </ResponsiveContainer>
                       </div>
                     </div>
                     <div className="border border-border bg-card p-4">
                       <p className="mb-2 text-xs font-bold uppercase">Ventas por producto</p>
                       <div className="h-64">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={salesByProduct}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="name" />
-                            <YAxis />
-                            <Tooltip />
-                            <Bar dataKey="total" fill="#ef4444" />
-                          </BarChart>
-                        </ResponsiveContainer>
+                        {salesByProduct.length > 0 ? (
+                          <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={salesByProduct}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                              <YAxis />
+                              <Tooltip />
+                              <Line type="monotone" dataKey="total" stroke="#ef4444" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        ) : (
+                          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                            Aún no hay ventas registradas para mostrar.
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>

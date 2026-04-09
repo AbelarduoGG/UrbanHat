@@ -6,12 +6,33 @@ import { useState } from "react"
 import { Send, MapPin, Phone, Mail } from "lucide-react"
 
 export function ContactSection() {
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    subject: "",
+    message: "",
+  })
   const [submitted, setSubmitted] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    setSubmitted(true)
-    setTimeout(() => setSubmitted(false), 3000)
+    if (isSubmitting) return
+
+    setIsSubmitting(true)
+    setTimeout(() => {
+      setSubmitted(true)
+      setFormData({ name: "", email: "", subject: "", message: "" })
+      setIsSubmitting(false)
+      setTimeout(() => setSubmitted(false), 3000)
+    }, 900)
+  }
+
+  const handleFieldChange = (
+    field: "name" | "email" | "subject" | "message",
+    value: string
+  ) => {
+    setFormData((prev) => ({ ...prev, [field]: value }))
   }
 
   return (
@@ -93,6 +114,8 @@ export function ContactSection() {
                 <input
                   id="name"
                   type="text"
+                  value={formData.name}
+                  onChange={(e) => handleFieldChange("name", e.target.value)}
                   required
                   placeholder="Tu nombre"
                   suppressHydrationWarning
@@ -109,6 +132,8 @@ export function ContactSection() {
                 <input
                   id="email"
                   type="email"
+                  value={formData.email}
+                  onChange={(e) => handleFieldChange("email", e.target.value)}
                   required
                   placeholder="tu@email.com"
                   suppressHydrationWarning
@@ -126,6 +151,8 @@ export function ContactSection() {
               <input
                 id="subject"
                 type="text"
+                value={formData.subject}
+                onChange={(e) => handleFieldChange("subject", e.target.value)}
                 required
                 placeholder="De que quieres hablar?"
                 suppressHydrationWarning
@@ -141,6 +168,8 @@ export function ContactSection() {
               </label>
               <textarea
                 id="message"
+                value={formData.message}
+                onChange={(e) => handleFieldChange("message", e.target.value)}
                 required
                 rows={5}
                 placeholder="Escribe tu mensaje..."
@@ -150,10 +179,15 @@ export function ContactSection() {
             </div>
             <button
               type="submit"
+              disabled={isSubmitting}
               className="flex items-center justify-center gap-2 bg-accent px-8 py-4 text-sm font-bold uppercase tracking-widest text-accent-foreground transition-opacity hover:opacity-90"
             >
               <Send className="h-4 w-4" />
-              {submitted ? "Mensaje Enviado!" : "Enviar Mensaje"}
+              {isSubmitting
+                ? "Enviando..."
+                : submitted
+                  ? "Mensaje Enviado!"
+                  : "Enviar Mensaje"}
             </button>
           </form>
         </div>

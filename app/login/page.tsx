@@ -5,7 +5,7 @@ import { useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Eye, EyeOff, LogIn, ArrowRight } from "lucide-react"
+import { Eye, EyeOff } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 
 function LoginPageContent() {
@@ -125,7 +125,12 @@ function LoginPageContent() {
           </h1>
 
           {/* FORM */}
-          <form onSubmit={handleSubmit} className="mt-8">
+          <form
+            onSubmit={handleSubmit}
+            className="mt-8"
+            autoComplete="on"
+            suppressHydrationWarning
+          >
             <div className="flex flex-col gap-5">
 
               <div>
@@ -134,10 +139,13 @@ function LoginPageContent() {
                 </label>
                 <input
                   type="email"
+                  name="email"
+                  autoComplete="username"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full border border-border bg-card px-4 py-3 text-sm text-foreground"
                   placeholder="correo@ejemplo.com"
+                  suppressHydrationWarning
                 />
               </div>
 
@@ -149,10 +157,13 @@ function LoginPageContent() {
                 <div className="relative">
                   <input
                     type={showPassword ? "text" : "password"}
+                    name="password"
+                    autoComplete="current-password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="w-full border border-border bg-card px-4 py-3 pr-12 text-sm text-foreground"
                     placeholder="Tu contrasena"
+                    suppressHydrationWarning
                   />
 
                   <button
@@ -176,6 +187,7 @@ function LoginPageContent() {
               type="submit"
               disabled={isSubmitting}
               className="mt-6 w-full bg-accent py-4 text-sm font-bold uppercase text-accent-foreground"
+              suppressHydrationWarning
             >
               {isSubmitting ? "Ingresando..." : "Ingresar"}
             </button>
