@@ -6,15 +6,8 @@ import {
   getOrdersBySeller,
 } from "@/lib/services/order.service"
 import { createOrderSchema } from "@/lib/validations/order.schema"
-import type { ApiResponse } from "@/lib/types"
 import { getRequestAuth } from "@/lib/auth/request-auth"
 
-/**
- * POST /api/v1/orders
- * Crea una orden (desde app móvil).
- *
- * Auth aceptada: cookie de sesión web, bearer JWT o header x-user-id (MVP Android)
- */
 export async function POST(req: NextRequest) {
   try {
     const auth = getRequestAuth(req)
@@ -26,8 +19,14 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const body = await req.json()
-    const parsed = createOrderSchema.safeParse(body)
+    if (auth.role !== "buyer") {
+      return NextResponse.json<ApiResponse>(
+        { success: false, error: "Solo compradores pueden crear órdenes" },
+        { status: 403 }
+      )
+    }
+
+    const parsed = createOrderSchema.safeParse(await req.json())
 
     if (!parsed.success) {
       return NextResponse.json<ApiResponse>(
@@ -40,7 +39,14 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json<ApiResponse>(
       { success: true, data: { orderId: order._id.toString() } },
-      { status: 201 }
+      {
+        status: 201,
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+          Pragma: "no-cache",
+          Expires: "0",
+        },
+      }
     )
   } catch (error) {
     const message =
@@ -53,16 +59,12 @@ export async function POST(req: NextRequest) {
   }
 }
 
-/**
- * GET /api/v1/orders
- * Obtiene órdenes del comprador autenticado.
- */
 export async function GET(req: NextRequest) {
   try {
     const auth = getRequestAuth(req)
 
     if (!auth) {
-      return NextResponse.json<ApiResponse>(
+      return NextResponse.json(
         { success: false, error: "Se requiere autenticación" },
         { status: 401 }
       )
@@ -72,45 +74,53 @@ export async function GET(req: NextRequest) {
 
     if (scope === "seller") {
       if (auth.role !== "seller") {
-        return NextResponse.json<ApiResponse>(
+        return NextResponse.json(
           { success: false, error: "Solo vendedores pueden consultar este listado" },
           { status: 403 }
         )
       }
-
       const orders = await getOrdersBySeller(auth.userId)
-
-      return NextResponse.json<ApiResponse>(
-        { success: true, data: orders },
-        { status: 200 }
-      )
+      return NextResponse.json({ success: true, data: orders }, { 
+        status: 200,
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
+      })
     }
 
     if (scope === "admin") {
       if (auth.role !== "superadmin") {
-        return NextResponse.json<ApiResponse>(
+        return NextResponse.json(
           { success: false, error: "Solo administradores pueden consultar este listado" },
           { status: 403 }
         )
       }
-
       const orders = await getAllOrders()
-
-      return NextResponse.json<ApiResponse>(
-        { success: true, data: orders },
-        { status: 200 }
-      )
+      return NextResponse.json({ success: true, data: orders }, { 
+        status: 200,
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
+      })
     }
 
     const orders = await getOrdersByBuyer(auth.userId)
+    return NextResponse.json({ success: true, data: orders }, { 
+      status: 200,
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      },
+    })
 
-    return NextResponse.json<ApiResponse>(
-      { success: true, data: orders },
-      { status: 200 }
-    )
   } catch (error) {
     console.error("[GET /api/v1/orders]", error)
-    return NextResponse.json<ApiResponse>(
+    return NextResponse.json(
       { success: false, error: "Error interno del servidor" },
       { status: 500 }
     )

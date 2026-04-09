@@ -1,36 +1,78 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# UrbanHat
 
-## Getting Started
+Marketplace escolar con arquitectura de monolito modular en Next.js para:
 
-First, run the development server:
+- Web (admin y vendedores)
+- API REST bajo `/api/v1`
+- Cliente instalable PWA
+
+## Stack
+
+- Next.js 16 (App Router)
+- React 19
+- TypeScript
+- TailwindCSS
+- MongoDB (Mongoose)
+- Jest + ESLint
+
+## Requisitos
+
+- Node.js 20+
+- pnpm 9+
+
+## Gestor de paquetes oficial
+
+Este repositorio usa **pnpm** como gestor unico.
+
+- Usa `pnpm-lock.yaml` como lockfile oficial.
+- No usar `npm install` ni `yarn` para evitar lockfiles inconsistentes.
+
+## Instalacion
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Comandos principales
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+pnpm dev
+pnpm build
+pnpm start
+pnpm lint
+pnpm test
+pnpm test:watch
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Variables de entorno
 
-## Learn More
+1. Copia el archivo base:
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+cp .env.example .env.local
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+2. Completa credenciales locales (MongoDB, JWT, Stripe, etc).
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## PWA
 
-## Deploy on Vercel
+- Manifest principal: `app/manifest.ts` (ruta final: `/manifest.webmanifest`)
+- Service Worker: `public/sw.js`
+- Registro del SW: `components/pwa-register.tsx` (montado en `app/layout.tsx`)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Documentacion del proyecto
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Arquitectura: `docs/01-architecture.md`
+- Esquema de base de datos: `docs/02-database-schema.md`
+- Contrato API: `docs/03-api-endpoints.md`
+- Reglas de negocio: `docs/04-business-rules.md`
+
+## Notas de colaboracion
+
+- Mantener cambios pequenos y atomicos.
+- Para backend, seguir validaciones en `lib/validations`, servicios en `lib/services` y rutas en `app/api/v1`.
+- Formato de respuesta API esperado:
+
+```json
+{ "success": true, "data": {}, "error": "" }
+```

@@ -306,9 +306,10 @@ export function ProductsSection() {
         </div>
       </div>
 
-      {selectedProduct && canBuy && (
+      {selectedProduct && (
         <ProductModal
           product={selectedProduct}
+          canBuy={canBuy}
           onClose={() => setSelectedProduct(null)}
         />
       )}

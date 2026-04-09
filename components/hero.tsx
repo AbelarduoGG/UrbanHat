@@ -6,14 +6,21 @@ export function Hero() {
       id="inicio"
       className="relative flex min-h-screen items-center justify-center overflow-hidden"
     >
-      {/* Background image */}
-      <Image
-        src="/hero-bg.jpg"
-        alt=""
-        fill
-        className="object-cover"
-        priority
-      />
+
+        <Image
+          src="/hero-bg.jpg"
+          alt=""
+          fill
+          className="hidden md:block object-cover"
+          priority
+        />
+        <Image
+          src="/hero-mobile.jpg"
+          alt=""
+          fill
+          className="block md:hidden object-cover"
+          priority
+        />
       {/* Dark overlay */}
       <div className="absolute inset-0 bg-background/75" />
 

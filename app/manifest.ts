@@ -2,9 +2,10 @@ import type { MetadataRoute } from "next"
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
+    id: "/",
     name: "Urban Hat",
     short_name: "UrbanHat",
-    description: "Tienda Urban Hat para web y app instalable en escritorio y móvil",
+    description: "Tienda Urban Hat para web y app instalable",
     start_url: "/",
     display: "standalone",
     background_color: "#0b1220",
@@ -14,20 +15,34 @@ export default function manifest(): MetadataRoute.Manifest {
     categories: ["shopping", "lifestyle", "business"],
     icons: [
       {
-        src: "/logo.jpeg",
+        src: "/logo-192.png",
         sizes: "192x192",
-        type: "image/jpeg",
+        type: "image/png",
       },
       {
-        src: "/logo.jpeg",
+        src: "/logo-512.png",
         sizes: "512x512",
-        type: "image/jpeg",
+        type: "image/png",
       },
       {
-        src: "/logo.jpeg",
+        src: "/logo-512.png",
         sizes: "512x512",
-        type: "image/jpeg",
+        type: "image/png",
         purpose: "maskable",
+      },
+    ],
+    screenshots: [
+      {
+        src: "/screenshot-desktop.png",
+        sizes: "1884x975",
+        type: "image/png",
+        form_factor: "wide",
+      },
+      {
+        src: "/screenshot-mobile.png",
+        sizes: "899x963",
+        type: "image/png",
+        form_factor: "narrow",
       },
     ],
   }
