@@ -1,46 +1,99 @@
-import { NextResponse } from "next/server"
-import mongoose from "mongoose"
-import { connectDB } from "@/lib/db"
-import { Order } from "@/lib/db/models"
+import { NextRequest, NextResponse } from "next/server"
+import { getRequestAuth } from "@/lib/auth/request-auth"
+import { connectDB } from "@/lib/db/connection"
+import { User } from "@/lib/db/models"
+import { adminUpdateUserSchema } from "@/lib/validations/user.schema"
+import type { ApiResponse } from "@/lib/types"
 
-export async function PATCH(
-  req: Request,
-  context: { params: { id: string } }
-) {
-  await connectDB()
+interface RouteParams {
+  params: { id: string }
+}
 
-  const id = context.params.id // 👈 CAMBIO CLAVE
-
-  console.log("BACKEND ID:", id) // 👈 DEBUG
-
-  const body = await req.json()
-
-  const { shippingStatus, carrier, trackingNumber } = body
-
+export async function PATCH(req: NextRequest, { params }: RouteParams) {
   try {
-    const order = await Order.findById(id)
+    const auth = getRequestAuth(req)
 
-    if (!order) {
-      return NextResponse.json(
-        { success: false, error: "Pedido no encontrado" },
+    if (!auth) {
+      return NextResponse.json<ApiResponse>(
+        { success: false, error: "Se requiere autenticación" },
+        { status: 401 }
+      )
+    }
+
+    if (auth.role !== "superadmin") {
+      return NextResponse.json<ApiResponse>(
+        { success: false, error: "Solo superadmin puede actualizar usuarios" },
+        { status: 403 }
+      )
+    }
+
+    const { id } = params
+    const body = await req.json()
+    const parsed = adminUpdateUserSchema.safeParse(body)
+
+    if (!parsed.success) {
+      return NextResponse.json<ApiResponse>(
+        { success: false, error: parsed.error.errors[0].message },
+        { status: 400 }
+      )
+    }
+
+    if (!parsed.data.role && parsed.data.isActive === undefined) {
+      return NextResponse.json<ApiResponse>(
+        { success: false, error: "No hay cambios para aplicar" },
+        { status: 400 }
+      )
+    }
+
+    await connectDB()
+    const targetUser = await User.findById(id)
+
+    if (!targetUser) {
+      return NextResponse.json<ApiResponse>(
+        { success: false, error: "Usuario no encontrado" },
         { status: 404 }
       )
     }
 
-    // actualizar campos
-    if (shippingStatus) order.shippingStatus = shippingStatus
-    if (carrier) order.carrier = carrier
-    if (trackingNumber) order.trackingNumber = trackingNumber
+    if (targetUser.role === "superadmin") {
+      return NextResponse.json<ApiResponse>(
+        { success: false, error: "No se puede modificar otro superadmin" },
+        { status: 403 }
+      )
+    }
 
-    await order.save()
+    if (parsed.data.role) {
+      targetUser.role = parsed.data.role
+      if (parsed.data.role !== "seller") {
+        targetUser.shopName = undefined
+      }
+    }
 
-    return NextResponse.json({
-      success: true,
-      data: order,
-    })
+    if (parsed.data.isActive !== undefined) {
+      targetUser.isActive = parsed.data.isActive
+    }
+
+    await targetUser.save()
+
+    return NextResponse.json<ApiResponse>(
+      {
+        success: true,
+        data: {
+          id: targetUser._id.toString(),
+          name: targetUser.name,
+          email: targetUser.email,
+          role: targetUser.role,
+          shopName: targetUser.shopName,
+          isActive: targetUser.isActive,
+          createdAt: targetUser.createdAt,
+        },
+      },
+      { status: 200 }
+    )
   } catch (error) {
-    return NextResponse.json(
-      { success: false, error: "Error al actualizar envío" },
+    console.error("[PATCH /api/v1/admin/users/:id]", error)
+    return NextResponse.json<ApiResponse>(
+      { success: false, error: "Error interno del servidor" },
       { status: 500 }
     )
   }

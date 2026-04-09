@@ -153,6 +153,7 @@ export function ProductModal({ product, onClose, canBuy }: ProductModalProps) {
                 type="button"
                 onClick={() => setQuantity(Math.max(1, quantity - 1))}
                 className="flex h-10 w-10 items-center justify-center text-foreground transition-colors hover:bg-secondary"
+                aria-label="Disminuir cantidad"
               >
                 <Minus className="h-4 w-4" />
               </button>
@@ -167,6 +168,7 @@ export function ProductModal({ product, onClose, canBuy }: ProductModalProps) {
                   setQuantity(Math.min(product.stock, quantity + 1))
                 }
                 className="flex h-10 w-10 items-center justify-center text-foreground transition-colors hover:bg-secondary"
+                aria-label="Aumentar cantidad"
               >
                 <Plus className="h-4 w-4" />
               </button>

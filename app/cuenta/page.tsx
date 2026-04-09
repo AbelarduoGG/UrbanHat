@@ -699,9 +699,12 @@ export default function AccountPage() {
                         key={order.id}
                         className="border border-border bg-card"
                       >
-                        <div
-                          className="flex cursor-pointer items-center justify-between p-4 hover:bg-secondary/50"
+                        <button
+                          type="button"
+                          className="flex w-full items-center justify-between p-4 text-left transition-colors hover:bg-secondary/50"
                           onClick={() => setExpandedOrder(expandedOrder === order.id ? null : order.id)}
+                          aria-expanded={expandedOrder === order.id}
+                          aria-controls={`order-details-${order.id}`}
                         >
                           <div className="flex items-center gap-4">
                             <div className="flex h-10 w-10 items-center justify-center bg-primary">
@@ -731,10 +734,10 @@ export default function AccountPage() {
                             </div>
                             <Eye className={`h-4 w-4 text-muted-foreground transition-transform ${expandedOrder === order.id ? 'rotate-180' : ''}`} />
                           </div>
-                        </div>
+                        </button>
 
                         {expandedOrder === order.id && (
-                          <div className="border-t border-border p-4">
+                          <div id={`order-details-${order.id}`} className="border-t border-border p-4">
                             <div className="space-y-4">
                               {order.buyerNotification && (
                               <div className="rounded border border-amber-300/40 bg-amber-50 p-4 text-sm text-amber-900">

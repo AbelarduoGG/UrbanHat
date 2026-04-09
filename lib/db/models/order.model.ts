@@ -119,7 +119,7 @@ const OrderSchema = new Schema<IOrder>({
   },
 })
 
-// 🔥 ESTA LÍNEA ES LA MÁS IMPORTANTE
+// Reuse existing model during hot reload to avoid OverwriteModelError.
 export const Order =
   mongoose.models.Order ||
   mongoose.model<IOrder>("Order", OrderSchema)

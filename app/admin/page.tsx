@@ -672,9 +672,7 @@ export default function AdminPage() {
         setMessage(payload.error || "Error al guardar")
         return
       }
-      console.log("Shipping updated, refreshing sales...")
       await refreshSellerSales()
-      console.log("Sales refreshed")
       closeShippingModal()
     } catch (err) {
       console.error(err)

@@ -2,7 +2,7 @@ const CACHE_NAME = "urbanhat-v8"
 const API_CACHE = "urbanhat-api-v4"
 
 // INSTALAR
-self.addEventListener("install", (event) => {
+self.addEventListener("install", () => {
   self.skipWaiting()
 })
 
@@ -68,8 +68,15 @@ self.addEventListener("fetch", (event) => {
     return
   }
 
-  // 🔥 API PRODUCTOS
-  if (url.pathname.includes("/api/v1/products")) {
+  // 🔥 API PRODUCTOS PUBLICOS (evitar cachear variantes autenticadas)
+  const isPublicProductsRequest =
+    event.request.method === "GET" &&
+    url.pathname === "/api/v1/products" &&
+    !url.searchParams.has("mine") &&
+    !url.searchParams.has("all") &&
+    !event.request.headers.has("authorization")
+
+  if (isPublicProductsRequest) {
     event.respondWith(
       caches.open(API_CACHE).then(async (cache) => {
         const cached = await cache.match(event.request)

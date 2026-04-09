@@ -120,6 +120,13 @@ export async function getAllOrders() {
     .lean()
 }
 
+export async function getOrderById(orderId: string) {
+  await connectDB()
+  return Order.findById(orderId)
+    .select("items")
+    .lean()
+}
+
 export async function updateOrderShipping(
   orderId: string,
   data: {
