@@ -14,12 +14,23 @@ export function AboutSection() {
         <div className="grid items-center gap-12 lg:grid-cols-2">
           {/* Image */}
           <div className="relative aspect-[4/5] overflow-hidden">
-            <Image
-              src="/about-bg.jpg"
-              alt="Estilo urbano Urban Hat"
-              fill
-              className="object-cover"
-            />
+
+                <Image
+                  src="/about-bg.jpg"
+                  alt="Estilo urbano Urban Hat"
+                  fill
+                  className="hidden md:block object-cover"
+                  priority
+                />
+          
+                <Image
+                  src="/about-bg-mobile.jpg"
+                  alt="Estilo urbano Urban Hat"
+                  fill
+                  className="block md:hidden object-cover"
+                  priority
+                />
+
             <div className="absolute inset-0 bg-primary/30" />
             <div className="absolute bottom-6 left-6">
               <Image

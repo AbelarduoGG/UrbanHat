@@ -1,18 +1,18 @@
 "use client"
 
 import React, { Suspense } from "react"
-
 import { useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Eye, EyeOff, LogIn, ArrowRight } from "lucide-react"
+import { Eye, EyeOff } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 
 function LoginPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { login } = useAuth()
+
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
@@ -31,6 +31,7 @@ function LoginPageContent() {
     }
 
     const result = await login(email, password)
+
     if (result.success) {
       if (result.role === "seller" || result.role === "superadmin") {
         sessionStorage.setItem("urban-hat-admin", "true")
@@ -46,8 +47,19 @@ function LoginPageContent() {
   }
 
   return (
-    <div className="flex min-h-screen">
-      {/* Left side - decorative */}
+    <div className="relative flex min-h-screen">
+
+      <div className="absolute inset-0 -z-10 lg:hidden">
+        <Image
+          src="/street-mobile.jpg"
+          alt=""
+          fill
+          className="object-cover"
+          priority
+        />
+        <div className="absolute inset-0 bg-background/80" />
+      </div>
+
       <div className="relative hidden w-1/2 lg:block">
         <Image
           src="/street.jpg"
@@ -56,7 +68,9 @@ function LoginPageContent() {
           className="object-cover"
           priority
         />
+
         <div className="absolute inset-0 bg-background/70" />
+
         <div className="absolute inset-0 flex flex-col items-center justify-center px-12">
           <Image
             src="/logo.jpeg"
@@ -65,20 +79,23 @@ function LoginPageContent() {
             height={120}
             className="rounded-full"
           />
-          <h2 className="mt-6 text-center font-display text-4xl font-bold uppercase tracking-wider text-foreground">
+
+          <h2 className="mt-6 text-center font-display text-4xl font-bold uppercase text-foreground">
             Bienvenido de vuelta
           </h2>
+
           <p className="mt-3 text-center text-muted-foreground">
-            Inicia sesion para acceder a tu cuenta, ver tu historial de pedidos
-            y gestionar tu perfil.
+            Inicia sesion para acceder a tu cuenta
           </p>
         </div>
       </div>
 
-      {/* Right side - form */}
+      {/* 🔥 RIGHT SIDE / FORM */}
       <div className="flex w-full items-center justify-center px-4 py-12 lg:w-1/2">
-        <div className="w-full max-w-md">
-          {/* Mobile logo */}
+
+        <div className="w-full max-w-md rounded-lg bg-background/80 p-6 backdrop-blur-md">
+
+          {/* MOBILE HEADER */}
           <div className="mb-8 flex flex-col items-center lg:hidden">
             <Image
               src="/logo.jpeg"
@@ -87,111 +104,109 @@ function LoginPageContent() {
               height={80}
               className="rounded-full"
             />
-            <h1 className="mt-4 font-display text-2xl font-bold uppercase tracking-widest text-foreground">
+            <h1 className="mt-4 font-display text-2xl font-bold uppercase text-foreground">
               Urban Hat
             </h1>
           </div>
 
+          {/* DESKTOP HEADER */}
           <div className="hidden lg:block">
-            <h1 className="font-display text-3xl font-bold uppercase tracking-tight text-foreground">
+            <h1 className="font-display text-3xl font-bold uppercase text-foreground">
               Iniciar Sesion
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              Ingresa tus credenciales para acceder a tu cuenta
+              Ingresa tus credenciales
             </p>
           </div>
 
-          <h1 className="text-center font-display text-2xl font-bold uppercase tracking-tight text-foreground lg:hidden">
+          {/* MOBILE TITLE */}
+          <h1 className="text-center font-display text-2xl font-bold uppercase text-foreground lg:hidden">
             Iniciar Sesion
           </h1>
 
-          <form onSubmit={handleSubmit} className="mt-8">
+          {/* FORM */}
+          <form
+            onSubmit={handleSubmit}
+            className="mt-8"
+            autoComplete="on"
+            suppressHydrationWarning
+          >
             <div className="flex flex-col gap-5">
+
               <div>
-                <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                <label className="text-xs font-bold uppercase text-muted-foreground">
                   Email
                 </label>
                 <input
                   type="email"
+                  name="email"
+                  autoComplete="username"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full border border-border bg-card px-4 py-3.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+                  className="w-full border border-border bg-card px-4 py-3 text-sm text-foreground"
                   placeholder="correo@ejemplo.com"
-                  autoComplete="email"
+                  suppressHydrationWarning
                 />
               </div>
 
               <div>
-                <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                <label className="text-xs font-bold uppercase text-muted-foreground">
                   Contrasena
                 </label>
+
                 <div className="relative">
                   <input
                     type={showPassword ? "text" : "password"}
+                    name="password"
+                    autoComplete="current-password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full border border-border bg-card px-4 py-3.5 pr-12 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+                    className="w-full border border-border bg-card px-4 py-3 pr-12 text-sm text-foreground"
                     placeholder="Tu contrasena"
-                    autoComplete="current-password"
+                    suppressHydrationWarning
                   />
+
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
-                    aria-label={showPassword ? "Ocultar contrasena" : "Mostrar contrasena"}
+                    className="absolute right-4 top-1/2 -translate-y-1/2"
+                    aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
                   >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
+                    {showPassword ? <EyeOff /> : <Eye />}
                   </button>
                 </div>
               </div>
             </div>
 
             {error && (
-              <div className="mt-4 border border-destructive/30 bg-destructive/10 px-4 py-3">
-                <p className="text-xs font-medium text-destructive">{error}</p>
+              <div className="mt-4 bg-destructive/10 p-3">
+                <p className="text-xs text-destructive">{error}</p>
               </div>
             )}
 
             <button
               type="submit"
               disabled={isSubmitting}
-              className="mt-6 flex w-full items-center justify-center gap-2 bg-accent py-4 text-sm font-bold uppercase tracking-widest text-accent-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
+              className="mt-6 w-full bg-accent py-4 text-sm font-bold uppercase text-accent-foreground"
+              suppressHydrationWarning
             >
-              <LogIn className="h-4 w-4" />
               {isSubmitting ? "Ingresando..." : "Ingresar"}
             </button>
           </form>
 
-          <div className="mt-8 flex flex-col items-center gap-4">
-            <div className="flex items-center gap-3">
-              <div className="h-px w-12 bg-border" />
-              <span className="text-xs uppercase tracking-wider text-muted-foreground">
-                o
-              </span>
-              <div className="h-px w-12 bg-border" />
-            </div>
-
-            <Link
-              href="/registro"
-              className="group flex items-center gap-2 text-sm font-medium uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground"
-            >
-              Crear cuenta nueva
-              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+          {/* LINKS */}
+          <div className="mt-8 text-center">
+            <Link href="/registro" className="text-sm text-muted-foreground">
+              Crear cuenta nueva →
             </Link>
           </div>
 
-          <div className="mt-8 text-center">
-            <Link
-              href="/"
-              className="text-xs font-medium uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground"
-            >
+          <div className="mt-4 text-center">
+            <Link href="/" className="text-xs text-muted-foreground">
               Volver a la tienda
             </Link>
           </div>
+
         </div>
       </div>
     </div>
@@ -200,8 +215,9 @@ function LoginPageContent() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">Cargando...</div>}>
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center">Cargando...</div>}>
       <LoginPageContent />
     </Suspense>
   )
 }
+

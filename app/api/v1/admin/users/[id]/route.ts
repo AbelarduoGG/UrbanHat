@@ -6,10 +6,10 @@ import { adminUpdateUserSchema } from "@/lib/validations/user.schema"
 import type { ApiResponse } from "@/lib/types"
 
 interface RouteParams {
-  params: Promise<{ id: string }>
+  params: { id: string }
 }
 
-export async function PATCH(req: NextRequest, context: RouteParams) {
+export async function PATCH(req: NextRequest, { params }: RouteParams) {
   try {
     const auth = getRequestAuth(req)
 
@@ -27,7 +27,7 @@ export async function PATCH(req: NextRequest, context: RouteParams) {
       )
     }
 
-    const { id } = await context.params
+    const { id } = params
     const body = await req.json()
     const parsed = adminUpdateUserSchema.safeParse(body)
 

@@ -15,7 +15,13 @@ export interface IOrder extends Document {
   status: "pending" | "paid" | "shipped" | "cancelled"
   paymentProvider?: "stripe"
   paymentSessionId?: string
+
   shippingStatus: "seller_received" | "preparing" | "shipped" | "delivered"
+  trackingNumber?: string
+  carrier?: string
+  buyerNotification?: string
+  buyerNotificationAt?: Date
+
   shippingAddress?: {
     nombre: string
     apellido: string
@@ -28,6 +34,7 @@ export interface IOrder extends Document {
     estado: string
     codigoPostal: string
   }
+
   createdAt: Date
 }
 
@@ -50,25 +57,49 @@ const OrderSchema = new Schema<IOrder>({
   },
   items: [OrderItemSchema],
   totalAmount: { type: Number, required: true },
+
   status: {
     type: String,
     enum: ["pending", "paid", "shipped", "cancelled"],
     default: "paid",
   },
+
   paymentProvider: {
     type: String,
     enum: ["stripe"],
   },
+
   paymentSessionId: {
     type: String,
     unique: true,
     sparse: true,
   },
+
+  trackingNumber: {
+    type: String,
+    default: "",
+  },
+
+  carrier: {
+    type: String,
+    default: "",
+  },
+
+  buyerNotification: {
+    type: String,
+    default: "",
+  },
+
+  buyerNotificationAt: {
+    type: Date,
+  },
+
   shippingStatus: {
     type: String,
     enum: ["seller_received", "preparing", "shipped", "delivered"],
     default: "seller_received",
   },
+
   shippingAddress: {
     nombre: { type: String },
     apellido: { type: String },
@@ -81,9 +112,14 @@ const OrderSchema = new Schema<IOrder>({
     estado: { type: String },
     codigoPostal: { type: String },
   },
-  createdAt: { type: Date, default: Date.now },
+
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
 })
 
+// Reuse existing model during hot reload to avoid OverwriteModelError.
 export const Order =
   mongoose.models.Order ||
   mongoose.model<IOrder>("Order", OrderSchema)

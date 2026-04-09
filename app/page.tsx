@@ -11,6 +11,7 @@ import { NewsletterSection } from "@/components/newsletter-section"
 import { ContactSection } from "@/components/contact-section"
 import { Footer } from "@/components/footer"
 import { CartDrawer } from "@/components/cart-drawer"
+import InstallPWAButton from "@/components/InstallPWAButton"
 
 export default function Page() {
   return (
@@ -18,6 +19,7 @@ export default function Page() {
       <ProductsProvider>
         <CartProvider>
           <Navbar />
+          <InstallPWAButton />
           <main>
             <Hero />
             <MarqueeBanner />

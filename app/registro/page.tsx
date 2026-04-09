@@ -114,9 +114,20 @@ export default function RegisterPage() {
     setFormData((prev) => ({ ...prev, [key]: value }))
   }
 
-  return (
-    <div className="flex min-h-screen">
-      {/* Left side - decorative */}
+ return (
+    <div className="relative flex min-h-screen">
+
+      <div className="absolute inset-0 -z-10 lg:hidden">
+        <Image
+          src="/register-mobile.jpg"
+          alt=""
+          fill
+          className="object-cover"
+          priority
+        />
+        <div className="absolute inset-0 bg-background/80" />
+      </div>
+
       <div className="relative hidden w-1/2 lg:block">
         <Image
           src="/registro.jpg"
@@ -125,6 +136,7 @@ export default function RegisterPage() {
           className="object-cover"
           priority
         />
+
         <div className="absolute inset-0 bg-background/70" />
         <div className="absolute inset-0 flex flex-col items-center justify-center px-12">
           <Image
@@ -162,7 +174,9 @@ export default function RegisterPage() {
 
       {/* Right side - form */}
       <div className="flex w-full items-center justify-center px-4 py-12 lg:w-1/2">
-        <div className="w-full max-w-md">
+
+        <div className="w-full max-w-md rounded-lg bg-background/80 p-6 backdrop-blur-md">
+
           {/* Mobile logo */}
           <div className="mb-8 flex flex-col items-center lg:hidden">
             <Image

@@ -24,7 +24,7 @@ El sistema maneja tres roles distintos en la misma base de datos, pero con acces
 
 ### 2. Plataforma Cliente (PWA instalable)
 **Usuarios:** Compradores (Clientes finales).
-**Tecnología:** Sitio web instalable desde navegador mediante `manifest.webmanifest`.
+**Tecnología:** Sitio web instalable desde navegador mediante `manifest.webmanifest` generado por `app/manifest.ts`.
 **Funcionalidad:**
 - Catálogo unificado (feed de todos los vendedores).
 - Carrito de compras y Checkout.

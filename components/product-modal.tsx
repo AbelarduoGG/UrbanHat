@@ -9,9 +9,10 @@ import { useCart } from "@/lib/cart-context"
 interface ProductModalProps {
   product: Product
   onClose: () => void
+  canBuy: boolean
 }
 
-export function ProductModal({ product, onClose }: ProductModalProps) {
+export function ProductModal({ product, onClose, canBuy }: ProductModalProps) {
   const [quantity, setQuantity] = useState(1)
   const images = product.images?.length ? product.images : [product.image]
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
@@ -142,7 +143,7 @@ export function ProductModal({ product, onClose }: ProductModalProps) {
             )}
           </div>
 
-          {/* Quantity selector */}
+         {canBuy && (
           <div className="mt-4 flex items-center gap-4">
             <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
               Cantidad
@@ -156,9 +157,11 @@ export function ProductModal({ product, onClose }: ProductModalProps) {
               >
                 <Minus className="h-4 w-4" />
               </button>
+
               <span className="flex h-10 w-12 items-center justify-center border-x border-border text-sm font-bold text-foreground">
                 {quantity}
               </span>
+
               <button
                 type="button"
                 onClick={() =>
@@ -171,7 +174,9 @@ export function ProductModal({ product, onClose }: ProductModalProps) {
               </button>
             </div>
           </div>
+        )}
 
+        {canBuy && (
           <button
             type="button"
             onClick={handleAdd}
@@ -185,6 +190,7 @@ export function ProductModal({ product, onClose }: ProductModalProps) {
             <ShoppingBag className="h-4 w-4" />
             {product.stock === 0 ? "Agotado" : "Agregar al Carrito"}
           </button>
+        )}
         </div>
       </div>
     </div>
