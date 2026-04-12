@@ -7,7 +7,7 @@ import type { ApiResponse } from "@/lib/types"
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const auth = getRequestAuth(req)
@@ -26,7 +26,7 @@ export async function PATCH(
       )
     }
 
-    const { id } = params
+    const { id } = await params
 
     const parsed = updateOrderShippingSchema.safeParse(await req.json())
 
