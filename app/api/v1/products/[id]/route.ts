@@ -5,7 +5,7 @@ import { deleteProduct, updateProduct } from "@/lib/services/product.service"
 import type { ApiResponse } from "@/lib/types"
 
 interface RouteParams {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
 export async function PATCH(req: NextRequest, { params }: RouteParams) {
@@ -26,7 +26,7 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
       )
     }
 
-    const { id } = params
+    const { id } = await params
     const body = await req.json()
     const parsed = updateProductSchema.safeParse(body)
 
@@ -99,7 +99,7 @@ export async function DELETE(req: NextRequest, { params }: RouteParams) {
       )
     }
 
-    const { id } = params
+    const { id } = await params
     const product = await deleteProduct(id, auth.userId)
 
     if (!product) {
